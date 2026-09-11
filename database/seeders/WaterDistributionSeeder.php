@@ -25,8 +25,7 @@ class WaterDistributionSeeder extends Seeder
 
         // Categoría de Agua y Bidones
         $category = Category::firstOrCreate(
-            ['descripcion' => 'AGUA Y BIDONES'],
-            ['idusuario' => 1]
+            ['descripcion' => 'AGUA Y BIDONES']
         );
 
         // Productos esenciales
@@ -122,7 +121,12 @@ class WaterDistributionSeeder extends Seeder
                     'idalmacen' => $warehouseId,
                 ],
                 [
+                    'stock_minimo' => 10,
                     'stock_actual' => $pData['stock_actual'],
+                    'precio_compra' => $pData['precio_compra'],
+                    'precio_venta' => $pData['precio_venta'],
+                    'fecha_registro' => $now->toDateString(),
+                    'stock_entrada' => $pData['stock_actual'],
                 ]
             );
         }
