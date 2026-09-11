@@ -161,6 +161,7 @@
                         'report.billings.credit_notes'
                     ]);
                     $canConfiguracion = $authUser?->canany(['admin.business', 'admin.paymodes', 'admin.cashes', 'admin.series', 'admin.users', 'admin.roles']);
+                    $canDistribucion = $authUser?->canany(['admin.deliveries', 'admin.jug_movements', 'admin.loyalty']);
                 @endphp
                 <li class="nav-item dropdown no-caret dropdown-user me-3 me-lg-4">
                     <a class="btn btn-icon btn-transparent-dark dropdown-toggle" id="navbarDropdownUserImage" href="javascript:void(0);" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><img class="img-fluid" src="{{ asset('assets/img/illustrations/profiles/profile-4.png') }}"></a>
@@ -275,6 +276,44 @@
                                     <a class="nav-link {{ $isShipmentGuideScreen ? 'active' : '' }}" href="{{ route('admin.shipment_guides') }}">Guias de remision</a>
                                     @endcan
                                     {{-- <a class="nav-link" href="#">Cuentas por cobrar</a> --}}
+                                </nav>
+                            </div>
+                            @endif
+
+                            <!-- Sidenav Accordion (Distribución de Agua) -->
+                            @if($canDistribucion)
+                            <a class="nav-link {{ request()->is('deliveries*') || request()->is('jug-movements*') || request()->is('loyalty*') ? '' : 'collapsed' }}" 
+                                href="javascript:void(0);" 
+                                data-bs-toggle="collapse" 
+                                data-bs-target="#collapseWater" 
+                                aria-expanded="{{ request()->is('deliveries*') || request()->is('jug-movements*') || request()->is('loyalty*') ? 'true' : 'false' }}" 
+                                aria-controls="collapseWater">
+                                <div class="nav-link-icon"><i data-feather="droplet"></i></div>
+                                Distribución de Agua
+                                <div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            </a>
+                            <div class="collapse {{ request()->is('deliveries*') || request()->is('jug-movements*') || request()->is('loyalty*') ? 'show' : '' }}" 
+                                id="collapseWater" 
+                                data-bs-parent="#accordionSidenav">
+                                <nav class="sidenav-menu-nested nav">
+                                    @can('admin.deliveries')
+                                    <a class="nav-link {{ request()->is('deliveries') ? 'active' : '' }}" href="{{ route('admin.deliveries') }}">
+                                        Pedidos y Reparto
+                                    </a>
+                                    <a class="nav-link {{ request()->is('deliveries/qr') ? 'active' : '' }}" href="{{ route('admin.deliveries.qr') }}">
+                                        Generador QR Pedidos
+                                    </a>
+                                    @endcan
+                                    @can('admin.jug_movements')
+                                    <a class="nav-link {{ request()->is('jug-movements*') ? 'active' : '' }}" href="{{ route('admin.jug_movements') }}">
+                                        Control de Envases
+                                    </a>
+                                    @endcan
+                                    @can('admin.loyalty')
+                                    <a class="nav-link {{ request()->is('loyalty*') ? 'active' : '' }}" href="{{ route('admin.loyalty') }}">
+                                        Fidelización (4+1)
+                                    </a>
+                                    @endcan
                                 </nav>
                             </div>
                             @endif
