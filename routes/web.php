@@ -28,6 +28,10 @@ use App\Http\Controllers\WarehouseSelectorController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ReportSalesController;
 use App\Http\Controllers\ShipmentGuideController;
+use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\JugMovementController;
+use App\Http\Controllers\LoyaltyController;
+use App\Http\Controllers\PublicQrOrderController;
 use Illuminate\Http\Request;
 
 
@@ -352,3 +356,46 @@ Route::controller(BuyController::class)->prefix('buys')->middleware(['auth', 'ca
     Route::post('/print-buy'                , 'print')->name('admin.print_buy');
     Route::get('/pdf'                       , 'test_pdf');
 });
+
+# RUTAS PÚBLICAS DE PEDIDOS POR CÓDIGO QR
+Route::controller(PublicQrOrderController::class)->prefix('pedido')->group(function() {
+    Route::get('/'                          , 'index')->name('public.order.index');
+    Route::post('/check-client'             , 'check_client')->name('public.order.check_client');
+    Route::post('/store'                    , 'store')->name('public.order.store');
+    Route::get('/seguimiento/{code}'        , 'tracking')->name('public.order.tracking');
+});
+Route::get('/pedidos', [PublicQrOrderController::class, 'index']);
+Route::get('/pedidos-qr', [PublicQrOrderController::class, 'index']);
+
+# GESTIÓN DE LOGÍSTICA Y REPARTO (DELIVERY)
+Route::controller(DeliveryController::class)->prefix('deliveries')->middleware(['auth', 'can:admin.deliveries'])->group(function() {
+    Route::get('/'                          , 'index')->name('admin.deliveries');
+    Route::get('/get'                       , 'get')->name('deliveries.get');
+    Route::post('/store'                    , 'store')->name('deliveries.store');
+    Route::post('/assign'                   , 'assign_driver')->name('deliveries.assign');
+    Route::post('/complete'                 , 'complete')->name('deliveries.complete');
+    Route::post('/cancel'                   , 'cancel')->name('deliveries.cancel');
+    Route::get('/show/{id}'                 , 'show')->name('deliveries.show');
+    Route::get('/qr'                        , 'qr_generator')->name('admin.deliveries.qr');
+});
+
+# CONTROL DE ENVASES RETORNABLES Y COMODATOS
+Route::controller(JugMovementController::class)->prefix('jug-movements')->middleware(['auth', 'can:admin.jug_movements'])->group(function() {
+    Route::get('/'                          , 'index')->name('admin.jug_movements');
+    Route::get('/get'                       , 'get')->name('jug_movements.get');
+    Route::get('/get-movements'             , 'get_movements')->name('jug_movements.get_movements');
+    Route::post('/store-return'             , 'store_return')->name('jug_movements.store_return');
+    Route::post('/adjust-balance'           , 'adjust_balance')->name('jug_movements.adjust_balance');
+    Route::get('/client-history/{id}'       , 'client_history')->name('jug_movements.client_history');
+});
+
+# PROGRAMA DE FIDELIZACIÓN (4+1 AJUSTABLE)
+Route::controller(LoyaltyController::class)->prefix('loyalty')->middleware(['auth', 'can:admin.loyalty'])->group(function() {
+    Route::get('/'                          , 'index')->name('admin.loyalty');
+    Route::get('/get-clients'               , 'get_clients')->name('loyalty.get_clients');
+    Route::post('/save-settings'            , 'save_settings')->name('loyalty.save_settings');
+    Route::get('/check/{id}'                , 'check_client')->name('loyalty.check');
+    Route::post('/add-point'                , 'add_point')->name('loyalty.add_point');
+    Route::post('/redeem-reward'            , 'redeem_reward')->name('loyalty.redeem_reward');
+});
+
