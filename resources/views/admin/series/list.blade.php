@@ -1,0 +1,55 @@
+@extends('admin.layout')
+@section('content')
+
+<header class="page-header page-header-compact page-header-light border-bottom bg-white mb-4">
+    <div class="container-xl px-4">
+        <div class="page-header-content">
+            <div class="row align-items-center justify-content-between pt-3">
+                <div class="col-auto mb-3">
+                    <h1 class="page-header-title">
+                        <div class="page-header-icon"><i data-feather="hash"></i></div>
+                        Gesti&oacute;n de Series
+                    </h1>
+                </div>
+                <div class="col-auto">
+                    <button class="dt-button create-new btn btn-success waves-effect waves-light btn-create mb-3" tabindex="0">
+                        <i class="ri-add-circle-line align-middle"></i>
+                        <span class="d-none d-sm-inline">Agregar serie</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="container-xl px-4 mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card custom-card pro-card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="table" class="table table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Serie</th>
+                                    <th scope="col">Correlativo</th>
+                                    <th scope="col">Comprobante</th>
+                                    <th scope="col">Caja</th>
+                                    <th scope="col" width="12%">Acciones</th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @include('admin.series.modals')
+</div>
+
+@endsection
+
+@section('scripts')
+    @include('admin.series.js-datatable')
+    @include('admin.series.js-store')
+@endsection
