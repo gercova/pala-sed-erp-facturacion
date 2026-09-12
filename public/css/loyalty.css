@@ -1,0 +1,160 @@
+/* ── Loyalty bar ── */
+.loyalty-card {
+    border: 1px solid #e3e7ef;
+}
+
+.loyalty-progress-wrap {
+    background: #f1f5f9;
+    border-radius: 50px;
+    height: 10px;
+    overflow: hidden;
+    margin: .75rem 0 .4rem;
+}
+
+.loyalty-progress-fill {
+    height: 100%;
+    border-radius: 50px;
+    background: #0b5ed7;
+    transition: width .6s cubic-bezier(.4, 0, .2, 1);
+}
+
+.loyalty-progress-fill.full {
+    background: #16a34a;
+}
+
+.star-row {
+    display: flex;
+    gap: .4rem;
+    margin-bottom: .5rem;
+}
+
+.star {
+    font-size: 1.3rem;
+}
+
+.star.filled {
+    color: #f59e0b;
+}
+
+.star.empty {
+    color: #e2e8f0;
+}
+
+/* ── Stats ── */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+}
+
+.stat-card {
+    background: #fff;
+    border: 1px solid #e3e7ef;
+    border-radius: 12px;
+    padding: 1.25rem 1rem;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #0b5ed7;
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: .78rem;
+    color: #64748b;
+    margin-top: .35rem;
+    font-weight: 500;
+}
+
+/* ── Order table ── */
+.orders-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .875rem;
+}
+
+.orders-table th {
+    text-align: left;
+    padding: .65rem 1rem;
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #64748b;
+    border-bottom: 1px solid #e3e7ef;
+}
+
+.orders-table td {
+    padding: .8rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    vertical-align: middle;
+}
+
+.orders-table tr:last-child td {
+    border-bottom: none;
+}
+
+.orders-table tr:hover td {
+    background: #f8fafc;
+}
+
+.btn-track {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .3rem .75rem;
+    border-radius: 8px;
+    font-size: .8rem;
+    font-weight: 600;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    text-decoration: none;
+    transition: all .15s;
+}
+
+.btn-track:hover {
+    background: #dbeafe;
+}
+
+/* ── Free reward badge ── */
+.reward-banner {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+}
+
+.reward-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #dcfce7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.reward-text h5 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #14532d;
+    margin: 0 0 .2rem;
+}
+
+.reward-text p {
+    font-size: .85rem;
+    color: #166534;
+    margin: 0;
+}
