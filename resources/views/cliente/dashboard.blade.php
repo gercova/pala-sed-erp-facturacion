@@ -1,8 +1,6 @@
 @extends('cliente.layout')
-
 @section('title', 'Mi Panel')
 @section('meta_description', 'Panel de control del cliente — pedidos, fidelización e historial.')
-
 @section('extra-styles')
 /* ── Loyalty bar ── */
 .loyalty-card {
