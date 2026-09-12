@@ -40,5 +40,6 @@ class DatabaseSeeder extends Seeder
         $this->call(PayModeSeeder::class);
         $this->call(RoleSeeder::class);
         $this->call(UserSeeder::class);
+        $this->call(ClienteRoleSeeder::class);
     }
 }
