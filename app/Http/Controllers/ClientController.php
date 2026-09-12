@@ -82,27 +82,39 @@ class ClientController extends Controller
             ->first(['id', 'codigo']);
 
         if (! $typeDocument) {
-            return response()->json(['status' => false, 'msg' => 'Tipo de documento invalido.', 'type' => 'warning'], 422);
+            return response()->json([
+                'status'    => false,
+                'msg'       => 'Tipo de documento invalido.',
+                'type'      => 'warning'
+            ], 422);
         }
 
         $typeCode = trim((string) $typeDocument->codigo);
         $dniRuc = trim((string) $request->input('dni_ruc'));
 
         if ($typeCode === '1' && strlen($dniRuc) !== 8) {
-            return response()->json(['status' => false, 'msg' => 'Para DNI debe ingresar 8 digitos.', 'type' => 'warning'], 422);
+            return response()->json([
+                'status'    => false,
+                'msg'       => 'Para DNI debe ingresar 8 digitos.',
+                'type'      => 'warning'
+            ], 422);
         }
 
         if ($typeCode === '6' && strlen($dniRuc) !== 11) {
-            return response()->json(['status' => false, 'msg' => 'Para RUC debe ingresar 11 digitos.', 'type' => 'warning'], 422);
+            return response()->json([
+                'status'    => false,
+                'msg'       => 'Para RUC debe ingresar 11 digitos.',
+                'type'      => 'warning'
+            ], 422);
         }
 
         $document = $this->verify__client($dniRuc);
 
         if (! isset($document->status) || (int) $document->status === 404) {
             return response()->json([
-                'status' => false,
-                'msg' => $document->message ?? 'No se pudo obtener la informacion del documento.',
-                'type' => 'warning',
+                'status'    => false,
+                'msg'       => $document->message ?? 'No se pudo obtener la informacion del documento.',
+                'type'      => 'warning'
             ], 404);
         }
 
@@ -110,9 +122,9 @@ class ClientController extends Controller
 
         if (! $data) {
             return response()->json([
-                'status' => false,
-                'msg' => 'No se encontro informacion para el documento consultado.',
-                'type' => 'warning',
+                'status'    => false,
+                'msg'       => 'No se encontro informacion para el documento consultado.',
+                'type'      => 'warning'
             ], 404);
         }
 
@@ -127,10 +139,10 @@ class ClientController extends Controller
         }
 
         return response()->json([
-            'status' => true,
-            'nombres' => trim((string) $names),
+            'status'    => true,
+            'nombres'   => trim((string) $names),
             'direccion' => trim((string) $address),
-            'ubigeo' => $ubigeo,
+            'ubigeo'    => $ubigeo,
         ]);
     }
 
@@ -375,7 +387,6 @@ class ClientController extends Controller
     private function normalizeNullableText(?string $value): ?string
     {
         $value = trim((string) $value);
-
         return $value !== '' ? $value : null;
     }
 }
