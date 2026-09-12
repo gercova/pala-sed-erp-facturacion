@@ -32,7 +32,9 @@ class Business extends Model
         'gre_client_id',
         'gre_client_secret',
         'instancia_wpp',
-        'cobrar_igv'
+        'cobrar_igv',
+        'yape_qr',
+        'plin_qr',
     ];
 
     protected $casts = [
