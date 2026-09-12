@@ -32,6 +32,7 @@ use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\JugMovementController;
 use App\Http\Controllers\LoyaltyController;
 use App\Http\Controllers\PublicQrOrderController;
+use App\Http\Controllers\Cliente\ClientePortalController;
 use Illuminate\Http\Request;
 
 
@@ -49,7 +50,17 @@ use Illuminate\Http\Request;
 Route::get('/'                              , [LoginController::class, 'index'])->name('login')->middleware('guest');
 Route::controller(LoginController::class)->prefix('login')->group(function() {
     Route::post('/login'                    , 'login')->name('login.login');
+    Route::post('/register'                 , 'register')->name('login.register')->middleware('guest');
     Route::get('/logout'                    , 'logout')->name('login.logout');
+});
+
+# PORTAL DE CLIENTES
+Route::controller(ClientePortalController::class)->prefix('cliente')->middleware(['auth', 'cliente'])->group(function () {
+    Route::get('/dashboard'                 , 'dashboard')->name('cliente.dashboard');
+    Route::get('/pedido/nuevo'              , 'order')->name('cliente.order');
+    Route::post('/pedido/store'             , 'storeOrder')->name('cliente.order.store');
+    Route::get('/pedido/{code}'             , 'tracking')->name('cliente.tracking');
+    Route::get('/logout'                    , 'logout')->name('cliente.logout');
 });
 
 Route::get('/home'                          , [HomeController::class, 'index'])->name('admin.home')->middleware(['auth', 'can:admin.home']);
