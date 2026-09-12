@@ -21,7 +21,6 @@
     <script data-search-pseudo-elements="" defer="" src="{{ asset('ajax/libs/font-awesome/6.3.0/js/all.min.js') }}">
     </script>
     <script src="{{ asset('ajax/libs/feather-icons/4.29.0/feather.min.js') }}"></script>
-
     <style>
         /* Enterprise polish without breaking SB Admin Pro */
         .topnav.navbar {
@@ -64,7 +63,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
-
 
     @yield('styles')
 </head>
