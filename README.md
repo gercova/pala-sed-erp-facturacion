@@ -1,16 +1,17 @@
-# 💧 Pala-Sed ERP / EasyStock
+# Pala-Sed ERP / EasyStock
 
 > **Sistema Integral de Gestión Empresarial, Punto de Venta (POS), Control Logístico de Distribución de Agua, Envases Retornables y Facturación Electrónica SUNAT (UBL 2.1 - Perú).**
 
 [![Laravel 10](https://img.shields.io/badge/Laravel-10.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com)
 [![PHP 8.1+](https://img.shields.io/badge/PHP-8.1+-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://php.net)
-[![SUNAT UBL 2.1](https://img.shields.io/badge/SUNAT-UBL%202.1-005691?style=for-the-badge)](https://www.sunat.gob.pe)
+[![SUNAT UBL 2.1](<https://img.shields.io/badge/SUNAT-UBL%202.1-005691?style=for-the-badge>)](https://www.sunat.gob.pe)
 [![Bootstrap 5](https://img.shields.io/badge/Bootstrap-5.3-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)](https://getbootstrap.com)
 [![License](https://img.shields.io/badge/License-Proprietary-blue?style=for-the-badge)]()
 
 ---
 
-## 📌 Tabla de Contenidos
+## Tabla de Contenidos
+
 - [1. Descripción del Proyecto](#1-descripción-del-proyecto)
 - [2. Características Principales](#2-características-principales)
 - [3. Módulos del Sistema](#3-módulos-del-sistema)
@@ -26,9 +27,10 @@
 
 ## 1. Descripción del Proyecto
 
-**Pala-Sed ERP** (conocido internamente en interfaz como *EasyStock*) es una plataforma integral desarrollada para resolver de extremo a extremo las operaciones de comercializadoras, distribuidoras y embotelladoras de agua de mesa purificada, bebidas y retail. 
+**Pala-Sed ERP** (conocido internamente en interfaz como *EasyStock*) es una plataforma integral desarrollada para resolver de extremo a extremo las operaciones de comercializadoras, distribuidoras y embotelladoras de agua de mesa purificada, bebidas y retail.
 
 Integra en una misma base de código:
+
 1. **Facturación Electrónica Nativa (SUNAT):** Sin dependencias de servicios externos ni costes por comprobante emitido. Genera, firma con certificado digital (`.pfx`/`.pem`), empaqueta en ZIP y transmite vía SOAP UBL 2.1 Facturas, Boletas, Notas de Crédito, Notas de Débito y Guías de Remisión Electrónicas (GRE).
 2. **Logística y Reparto a Domicilio:** Gestión de despachos, asignación de choferes repartidores y trazabilidad de entrega en tiempo real.
 3. **Control de Envases Retornables (Bidones de 20L):** Control estricto de comodatos y balances de envases en poder del cliente para evitar pérdidas y cobro por reposición de botellones dañados.
@@ -51,27 +53,27 @@ Integra en una misma base de código:
 
 ## 3. Módulos del Sistema
 
-| Módulo | Descripción | Rutas Principales |
-| :--- | :--- | :--- |
-| **Principal / Dashboard** | KPIs en tiempo real, gráficas mensuales y métodos de pago. | `/home` |
-| **Punto de Venta (POS)** | Facturación en mostrador, escáner de barras, crédito y multimoneda. | `/pos`, `/pos/crear` |
-| **Comprobantes SUNAT** | Listado de boletas/facturas, descarga de XML, CDR y despacho manual. | `/billings` |
-| **Notas de Crédito y Débito** | Anulaciones y correcciones asociadas a comprobantes de origen. | `/billings/credit-notes`, `/billings/debit-notes` |
-| **Notas de Venta** | Documentos administrativos internos con reversión de inventario. | `/salenotes` |
-| **Guías de Remisión (GRE)** | Guías electrónicas para transporte público o privado de mercadería. | `/shipment-guides` |
-| **Distribución & Reparto** | Despachos de agua, asignación de choferes y franjas horarias. | `/deliveries` |
-| **Control de Envases** | Libro mayor de bidones retornables y balance por cliente. | `/jug-movements` |
-| **Fidelización** | Promociones automáticas (4+1 / 5+1) y canje de premios. | `/loyalty` |
-| **Portal Público QR** | Portal para clientes finales de pedidos express y rastreo en vivo. | `/pedido`, `/pedido/seguimiento/{code}` |
-| **Almacenes & Stock** | Existencias por sucursal, ajuste rápido y cambio de establecimiento. | `/warehouses`, `/establishment` |
-| **Órdenes de Traslado** | Movimiento de productos entre almacenes con aprobación atómica. | `/transferorders` |
-| **Kardex** | Trazabilidad de entradas, salidas y saldos físicos valorizados. | `/kardex` |
-| **Compras** | Abastecimiento a proveedores con actualización de costo de compra. | `/buys` |
-| **Cotizaciones** | Presupuestos comerciales convertibles a venta con un solo clic. | `/quotes` |
-| **Arqueos de Caja** | Apertura, depósitos, retiros, cuadre y cierre diario con ticket. | `/archingcash` |
-| **Clientes y Proveedores** | Consulta automática a RENIEC (DNI) y SUNAT (RUC) con Ubigeo. | `/clients`, `/providers` |
-| **Reportes Contables** | Registro de ventas oficial (PLE) y reportes de recaudación. | `/billings/reports/*`, `/reportes/*` |
-| **Configuración** | Certificado digital, credenciales SOL, empresa, usuarios y roles. | `/business`, `/users`, `/roles` |
+| Módulo                               | Descripción                                                            | Rutas Principales                                     |
+| :------------------------------------ | :---------------------------------------------------------------------- | :---------------------------------------------------- |
+| **Principal / Dashboard**       | KPIs en tiempo real, gráficas mensuales y métodos de pago.            | `/home`                                             |
+| **Punto de Venta (POS)**        | Facturación en mostrador, escáner de barras, crédito y multimoneda.  | `/pos`, `/pos/crear`                              |
+| **Comprobantes SUNAT**          | Listado de boletas/facturas, descarga de XML, CDR y despacho manual.    | `/billings`                                         |
+| **Notas de Crédito y Débito** | Anulaciones y correcciones asociadas a comprobantes de origen.          | `/billings/credit-notes`, `/billings/debit-notes` |
+| **Notas de Venta**              | Documentos administrativos internos con reversión de inventario.       | `/salenotes`                                        |
+| **Guías de Remisión (GRE)**   | Guías electrónicas para transporte público o privado de mercadería. | `/shipment-guides`                                  |
+| **Distribución & Reparto**     | Despachos de agua, asignación de choferes y franjas horarias.          | `/deliveries`                                       |
+| **Control de Envases**          | Libro mayor de bidones retornables y balance por cliente.               | `/jug-movements`                                    |
+| **Fidelización**               | Promociones automáticas (4+1 / 5+1) y canje de premios.                | `/loyalty`                                          |
+| **Portal Público QR**          | Portal para clientes finales de pedidos express y rastreo en vivo.      | `/pedido`, `/pedido/seguimiento/{code}`           |
+| **Almacenes & Stock**           | Existencias por sucursal, ajuste rápido y cambio de establecimiento.   | `/warehouses`, `/establishment`                   |
+| **Órdenes de Traslado**        | Movimiento de productos entre almacenes con aprobación atómica.       | `/transferorders`                                   |
+| **Kardex**                      | Trazabilidad de entradas, salidas y saldos físicos valorizados.        | `/kardex`                                           |
+| **Compras**                     | Abastecimiento a proveedores con actualización de costo de compra.     | `/buys`                                             |
+| **Cotizaciones**                | Presupuestos comerciales convertibles a venta con un solo clic.         | `/quotes`                                           |
+| **Arqueos de Caja**             | Apertura, depósitos, retiros, cuadre y cierre diario con ticket.       | `/archingcash`                                      |
+| **Clientes y Proveedores**      | Consulta automática a RENIEC (DNI) y SUNAT (RUC) con Ubigeo.           | `/clients`, `/providers`                          |
+| **Reportes Contables**          | Registro de ventas oficial (PLE) y reportes de recaudación.            | `/billings/reports/*`, `/reportes/*`              |
+| **Configuración**              | Certificado digital, credenciales SOL, empresa, usuarios y roles.       | `/business`, `/users`, `/roles`                 |
 
 ---
 
@@ -89,23 +91,28 @@ Integra en una misma base de código:
 ## 5. Instalación y Despliegue
 
 ### Paso 1: Clonar el Repositorio
+
 ```bash
 git clone https://github.com/usuario/pala-sed-erp.git
 cd pala-sed-erp
 ```
 
 ### Paso 2: Instalar Dependencias de PHP
+
 ```bash
 composer install --optimize-autoloader --no-dev
 ```
 
 ### Paso 3: Configuración de Variables de Entorno
+
 Copia el archivo `.env.example` y configura tu conexión de base de datos:
+
 ```bash
 cp .env.example .env
 ```
 
 Edita `.env` con tus credenciales:
+
 ```env
 APP_NAME="Pala-Sed ERP"
 APP_ENV=production
@@ -121,18 +128,22 @@ DB_PASSWORD=tu_password
 ```
 
 ### Paso 4: Generar la Clave de Aplicación y Enlace Simbólico
+
 ```bash
 php artisan key:generate
 php artisan storage:link
 ```
 
 ### Paso 5: Ejecutar Migraciones y Seeders
+
 Este comando creará las 55 tablas, ubigeos completos de Perú, catálogo de documentos SUNAT y los usuarios y datos iniciales de distribución de agua:
+
 ```bash
 php artisan migrate --seed
 ```
 
 ### Paso 6: Optimizar y Limpiar Caché
+
 ```bash
 php artisan config:cache
 php artisan route:cache
@@ -145,20 +156,21 @@ php artisan view:cache
 
 El seeder del sistema genera las siguientes cuentas de prueba:
 
-| Rol | Usuario (`user`) | Contraseña | Almacén Asignado | Permisos Principales |
-| :--- | :--- | :--- | :--- | :--- |
-| **SUPERADMIN** | `admin` | `admin123$$.` | Principal | Acceso total al sistema y parámetros fiscales |
-| **ADMIN** | `testuser` | `Test1234$$.` | Principal | Gestión completa operativa, almacenes y ventas |
-| **VENDEDOR** | `ventas` | `ventas123.` | Multi-almacén | POS, cotizaciones, notas de venta, clientes |
-| **CAJERO** | `cajero` | `cajero123.` | Principal | Arqueos de caja, cobros y ventas |
-| **CONTABILIDAD**| `conta` | `conta123.` | Principal | Reportes contables, comprobantes y registro de ventas |
-| **REPARTIDOR** | `repartidor1` | `repartidor123.` | Principal | Recepción y liquidación de pedidos en ruta |
+| Rol                    | Usuario (`user`) | Contraseña        | Almacén Asignado | Permisos Principales                                  |
+| :--------------------- | :----------------- | :----------------- | :---------------- | :---------------------------------------------------- |
+| **SUPERADMIN**   | `admin`          | `admin123$$.`    | Principal         | Acceso total al sistema y parámetros fiscales        |
+| **ADMIN**        | `testuser`       | `Test1234$$.`    | Principal         | Gestión completa operativa, almacenes y ventas       |
+| **VENDEDOR**     | `ventas`         | `ventas123.`     | Multi-almacén    | POS, cotizaciones, notas de venta, clientes           |
+| **CAJERO**       | `cajero`         | `cajero123.`     | Principal         | Arqueos de caja, cobros y ventas                      |
+| **CONTABILIDAD** | `conta`          | `conta123.`      | Principal         | Reportes contables, comprobantes y registro de ventas |
+| **REPARTIDOR**   | `repartidor1`    | `repartidor123.` | Principal         | Recepción y liquidación de pedidos en ruta          |
 
 ---
 
 ## 7. Guía de Configuración Tributaria (SUNAT)
 
 Para emitir comprobantes con validez fiscal en Perú:
+
 1. Inicia sesión con el usuario `admin` y dirígete al menú **Configuración > Empresa** (`/business`).
 2. **Datos de Empresa:** RUC (20610316884), Razón Social (`MYTEMS E.I.R.L.`), Nombre Comercial, Dirección Fiscal y Ubigeo.
 3. **Certificado Digital:**
@@ -198,8 +210,11 @@ sequenceDiagram
 ```
 
 ### Conceptos Clave de la Operación de Agua:
+
 * **Fórmula de Saldo de Envases:**
-  $$\text{Saldo Nuevo} = \text{Saldo Anterior} + \text{Llenos Entregados} - (\text{Vacíos Sanos} + \text{Dañados Retirados})$$
+  $$
+  \text{Saldo Nuevo} = \text{Saldo Anterior} + \text{Llenos Entregados} - (\text{Vacíos Sanos} + \text{Dañados Retirados})
+  $$
 * **Cobro por Envase Dañado:** Si el cliente retorna un envase roto o en malas condiciones, el chofer registra la incidencia y el sistema añade automáticamente la penalidad económica configurada al cobro final.
 * **Fidelización 4+1:** Al acumular 4 recargas de 20 litros, el sistema avisa automáticamente en el POS y en la pantalla móvil del cliente que su siguiente pedido tendrá costo cero en el producto promocionado.
 * **Generador de Códigos QR:** En `/deliveries/qr` se generan códigos QR listos para imprimir y pegar en los bidones, permitiendo a los clientes pedir recargas en menos de 30 segundos sin necesidad de descargar aplicaciones móviles.
@@ -258,9 +273,10 @@ pala-sed-erp/
 
 Para consultar la **especificación funcional y lógica exhaustiva**, el diccionario completo de las 55 tablas de base de datos, el detalle de los 41 modelos Eloquent y la matriz completa de más de 80 rutas web y API, revisa el archivo de especificación en:
 
-📄 **[docs/PDR.md](file:///media/gercova/DATA1/PROYECTOS%20WEB/pala-sed-erp/docs/PDR.md)**
+📄 **[docs/PDR.md](<file:///media/gercova/DATA1/PROYECTOS%20WEB/pala-sed-erp/docs/PDR.md>)**
 
 ---
 
 ## 📄 Licencia y Soporte
+
 Sistema desarrollado a medida para **MYTEMS E.I.R.L. / Pala-Sed ERP**. Todos los derechos reservados.
