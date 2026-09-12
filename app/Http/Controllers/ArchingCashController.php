@@ -6,7 +6,9 @@ use App\Models\ArchingCash;
 use App\Models\Billing;
 use App\Models\Business;
 use App\Models\Cash;
+use App\Models\DeliveryOrder;
 use App\Models\DetailPayment;
+use App\Models\JugMovement;
 use App\Models\SaleNote;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -20,21 +22,148 @@ class ArchingCashController extends Controller
     {
         $user = Auth::user()->loadMissing(['roles', 'activeWarehouse']);
         $assignedCash = $this->resolveAssignedCash($user);
+        $role = optional($user->roles->first())->name;
+        $warehouseId = (int) ($user->idalmacen ?? 0);
+        $isAdmin = in_array($role, ['SUPERADMIN', 'ADMIN'], true);
+
+        // Load open arching cashes according to user role/scope
         $openArchings = $this->accessibleArchingsQuery()
-            ->with(['cash', 'user'])
-            ->where('idusuario', $user->id)
-            ->where('estado', 1)
-            ->orderByDesc('id')
+            ->with(['cash', 'user', 'warehouse'])
+            ->where('arching_cashes.estado', 1)
+            ->orderByDesc('arching_cashes.id')
             ->get();
+
+        $myOpenArching = $openArchings->firstWhere('idusuario', $user->id);
+        $canOpenArching = (bool) $assignedCash && ! $myOpenArching;
+
+        // Daily Reconciliation Metrics for Today
+        $today = date('Y-m-d');
+        $todayArchingIds = $this->accessibleArchingsQuery()
+            ->whereDate('arching_cashes.fecha_inicio', $today)
+            ->pluck('arching_cashes.id')
+            ->toArray();
+
+        $validSaleNotesQuery = SaleNote::query()->where('estado', 1);
+        $validBillingsQuery = Billing::query()->where('anulado', false);
+        $annulledSaleNotesQuery = SaleNote::query()->where('estado', 2);
+        $annulledBillingsQuery = Billing::query()->where('anulado', true);
+
+        if (!empty($todayArchingIds)) {
+            $validSaleNotesQuery->whereIn('idarqueocaja', $todayArchingIds);
+            $validBillingsQuery->whereIn('idarqueocaja', $todayArchingIds);
+            $annulledSaleNotesQuery->whereIn('idarqueocaja', $todayArchingIds);
+            $annulledBillingsQuery->whereIn('idarqueocaja', $todayArchingIds);
+        } else {
+            $validSaleNotesQuery->whereDate('fecha_emision', $today);
+            $validBillingsQuery->whereDate('fecha_emision', $today);
+            $annulledSaleNotesQuery->whereDate('fecha_emision', $today);
+            $annulledBillingsQuery->whereDate('fecha_emision', $today);
+            if ($warehouseId > 0) {
+                $validBillingsQuery->where('idalmacen', $warehouseId);
+            }
+        }
+
+        $salesCountToday = (clone $validSaleNotesQuery)->count() + (clone $validBillingsQuery)->count();
+        $salesTotalToday = (float) (clone $validSaleNotesQuery)->sum('total') + (float) (clone $validBillingsQuery)->sum('total');
+        $annulledCountToday = (clone $annulledSaleNotesQuery)->count() + (clone $annulledBillingsQuery)->count();
+        $annulledTotalToday = (float) (clone $annulledSaleNotesQuery)->sum('total') + (float) (clone $annulledBillingsQuery)->sum('total');
+
+        // Deliveries & Orders today
+        $ordersTodayQuery = DeliveryOrder::query()
+            ->when($warehouseId > 0, fn($q) => $q->where('idalmacen', $warehouseId))
+            ->where(function ($q) use ($today) {
+                $q->whereDate('created_at', $today)
+                  ->orWhereDate('fecha_programada', $today);
+            });
+        $totalOrdersToday = (clone $ordersTodayQuery)->count();
+
+        $deliveredTodayQuery = DeliveryOrder::query()
+            ->when($warehouseId > 0, fn($q) => $q->where('idalmacen', $warehouseId))
+            ->where('estado', 'ENTREGADO')
+            ->where(function ($q) use ($today) {
+                $q->whereDate('fecha_entrega', $today)
+                  ->orWhereDate('updated_at', $today);
+            });
+        $totalDeliveriesToday = (clone $deliveredTodayQuery)->count();
+        $deliveriesTotalToday = (float) (clone $deliveredTodayQuery)->sum('total');
+
+        // Jug movements today
+        $jugMovementsToday = JugMovement::query()
+            ->when($warehouseId > 0, fn($q) => $q->where('idalmacen', $warehouseId))
+            ->whereDate('fecha', $today)
+            ->get();
+
+        $jugsIntactToday = (int) $jugMovementsToday->sum('devueltos_intactos');
+        $jugsDamagedToday = (int) $jugMovementsToday->sum('devueltos_danados');
+        $damageCostToday = (float) $jugMovementsToday->sum('costo_dano');
+        $jugsDeliveredToday = (int) $jugMovementsToday->sum('entregados_llenos');
+
+        if ($jugsIntactToday === 0 && $totalDeliveriesToday > 0) {
+            $jugsIntactToday = (int) (clone $deliveredTodayQuery)->sum('bidones_vacios_recibidos');
+        }
+        if ($jugsDamagedToday === 0 && $totalDeliveriesToday > 0) {
+            $jugsDamagedToday = (int) (clone $deliveredTodayQuery)->sum('bidones_danados_recibidos');
+            $damageCostToday = (float) (clone $deliveredTodayQuery)->sum('cobro_envases_danados');
+        }
+        if ($jugsDeliveredToday === 0 && $totalDeliveriesToday > 0) {
+            $jugsDeliveredToday = (int) (clone $deliveredTodayQuery)->sum('bidones_a_entregar');
+        }
+        $jugsLoanedToday = max(0, $jugsDeliveredToday - ($jugsIntactToday + $jugsDamagedToday));
+
+        // Sold water/containers today
+        $validSaleNoteIds = (clone $validSaleNotesQuery)->pluck('id');
+        $soldSaleNotesCount = $validSaleNoteIds->isNotEmpty() ? DB::table('detail_sale_notes')
+            ->join('products', 'detail_sale_notes.idproducto', '=', 'products.id')
+            ->whereIn('detail_sale_notes.idnotaventa', $validSaleNoteIds)
+            ->where(function ($q) {
+                $q->where('products.descripcion', 'LIKE', '%AGUA%')
+                  ->orWhere('products.descripcion', 'LIKE', '%BIDON%')
+                  ->orWhere('products.descripcion', 'LIKE', '%ENVASE%');
+            })
+            ->sum('detail_sale_notes.cantidad') : 0;
+
+        $validBillingIds = (clone $validBillingsQuery)->pluck('id');
+        $soldBillingsCount = $validBillingIds->isNotEmpty() ? DB::table('detail_billings')
+            ->join('products', 'detail_billings.idproducto', '=', 'products.id')
+            ->whereIn('detail_billings.idfacturacion', $validBillingIds)
+            ->where(function ($q) {
+                $q->where('products.descripcion', 'LIKE', '%AGUA%')
+                  ->orWhere('products.descripcion', 'LIKE', '%BIDON%')
+                  ->orWhere('products.descripcion', 'LIKE', '%ENVASE%');
+            })
+            ->sum('detail_billings.cantidad') : 0;
+
+        $jugsSoldToday = (int) ($soldSaleNotesCount + $soldBillingsCount);
+        if ($jugsSoldToday === 0 && $totalDeliveriesToday > 0) {
+            $jugsSoldToday = (int) (clone $deliveredTodayQuery)->sum('bidones_a_entregar');
+        }
+
+        $dailyReconciliation = [
+            'sales_total' => $salesTotalToday,
+            'sales_count' => $salesCountToday,
+            'annulled_total' => $annulledTotalToday,
+            'annulled_count' => $annulledCountToday,
+            'total_orders' => $totalOrdersToday,
+            'total_deliveries' => $totalDeliveriesToday,
+            'deliveries_total' => $deliveriesTotalToday,
+            'jugs_intact' => $jugsIntactToday,
+            'jugs_damaged' => $jugsDamagedToday,
+            'damage_cost' => $damageCostToday,
+            'jugs_loaned' => $jugsLoanedToday,
+            'jugs_sold' => $jugsSoldToday,
+        ];
 
         return view('admin.arching_cashes.list', [
             'signo' => $this->signo_pais(),
             'assignedCash' => $assignedCash,
             'currentWarehouse' => $user->activeWarehouse,
-            'openArching' => $openArchings->first(),
+            'openArching' => $myOpenArching ?: $openArchings->first(),
+            'myOpenArching' => $myOpenArching,
             'openArchings' => $openArchings,
-            'canOpenArching' => (bool) $assignedCash && $openArchings->isEmpty(),
+            'dailyReconciliation' => $dailyReconciliation,
+            'canOpenArching' => $canOpenArching,
             'filterCashes' => $this->availableCashesForCurrentWarehouse($assignedCash),
+            'isAdmin' => $isAdmin,
         ]);
     }
 
@@ -206,17 +335,21 @@ class ArchingCashController extends Controller
         }
 
         $summary = $this->buildSummary($archingCash);
+        $currentUser = Auth::user()->loadMissing('roles');
+        $isAdmin = $currentUser->hasAnyRole(['SUPERADMIN', 'ADMIN']);
+        $canClose = (int) $archingCash->estado === 1 && ((int) $archingCash->idusuario === (int) $currentUser->id || $isAdmin);
 
         return response()->json([
             'status' => true,
             'archingCash' => [
                 'id' => $archingCash->id,
                 'cash' => $archingCash->cash?->descripcion,
-                'warehouse' => Auth::user()->activeWarehouse?->descripcion ?: 'Almacen activo',
+                'warehouse' => $archingCash->warehouse?->descripcion ?: (Auth::user()->activeWarehouse?->descripcion ?: 'Almacen activo'),
                 'responsable' => $archingCash->user?->nombres,
                 'estado' => (int) $archingCash->estado,
                 'fecha_inicio' => optional($archingCash->fecha_inicio)->format('d/m/Y'),
                 'fecha_fin' => optional($archingCash->fecha_fin)->format('d/m/Y'),
+                'can_close' => $canClose,
             ],
             'summary' => $summary,
         ]);
@@ -339,20 +472,25 @@ class ArchingCashController extends Controller
             ], 422);
         }
 
-        if ((int) $archingCash->idusuario !== (int) Auth::id()) {
+        $user = Auth::user()->loadMissing('roles');
+        $isAdmin = $user->hasAnyRole(['SUPERADMIN', 'ADMIN']);
+
+        if ((int) $archingCash->idusuario !== (int) Auth::id() && ! $isAdmin) {
             return response()->json([
                 'status' => false,
-                'msg' => 'Solo la persona que aperturo esta caja puede cerrarla.',
+                'msg' => 'Solo la persona que aperturo esta caja o un administrador pueden cerrarla.',
                 'type' => 'warning'
-            ], 422);
+            ], 403);
         }
 
         $summary = $this->buildSummary($archingCash);
+        $montoReal = $request->filled('monto_real') ? (float) $request->input('monto_real') : null;
+        $montoFinal = $montoReal !== null ? $montoReal : (float) $summary['expected_final'];
 
         $archingCash->update([
             'estado' => 2,
-            'fecha_fin' => date('Y-m-d'),
-            'monto_final' => (float) $summary['expected_final'],
+            'fecha_fin' => now(),
+            'monto_final' => $montoFinal,
             'total_ventas' => (int) $summary['sales_count'],
         ]);
 
@@ -370,8 +508,11 @@ class ArchingCashController extends Controller
         $warehouseId = (int) ($user->idalmacen ?? 0);
 
         return ArchingCash::query()
-            ->when($warehouseId > 0, function ($query) use ($warehouseId) {
-                $query->where('arching_cashes.idalmacen', $warehouseId);
+            ->when($warehouseId > 0 && $role !== 'SUPERADMIN', function ($query) use ($warehouseId) {
+                $query->where(function ($sub) use ($warehouseId) {
+                    $sub->where('arching_cashes.idalmacen', $warehouseId)
+                        ->orWhereNull('arching_cashes.idalmacen');
+                });
             })
             ->when(! in_array($role, ['SUPERADMIN', 'ADMIN'], true), function ($query) use ($user) {
                 $query->where('arching_cashes.idusuario', $user->id);
@@ -381,7 +522,7 @@ class ArchingCashController extends Controller
     private function findAccessibleArchingCash(int $id): ?ArchingCash
     {
         return $this->accessibleArchingsQuery()
-            ->with(['cash', 'user'])
+            ->with(['cash', 'user', 'warehouse'])
             ->where('arching_cashes.id', $id)
             ->first();
     }
@@ -398,15 +539,121 @@ class ArchingCashController extends Controller
         $annulledCount = (clone $saleNotesAnnulled)->count() + (clone $billingsAnnulled)->count();
         $annulledTotal = (float) (clone $saleNotesAnnulled)->sum('total') + (float) (clone $billingsAnnulled)->sum('total');
         $grossTotal = $salesTotal + $annulledTotal;
+
+        $paymentSummary = $this->buildPaymentSummary($archingCash);
+
+        $cashTotal = 0.0;
+        $digitalTotal = 0.0;
+        foreach ($paymentSummary as $pay) {
+            $label = mb_strtolower($pay['label']);
+            if (str_contains($label, 'efectivo')) {
+                $cashTotal += (float) $pay['total'];
+            } else {
+                $digitalTotal += (float) $pay['total'];
+            }
+        }
+
+        $expectedCash = (float) $archingCash->monto_inicial + $cashTotal;
         $expectedFinal = (float) $archingCash->monto_inicial + $salesTotal;
         $displayFinal = (int) $archingCash->estado === 2
             ? (float) ($archingCash->monto_final ?? $expectedFinal)
             : $expectedFinal;
 
+        // Container / Jug & Delivery reconciliations
+        $saleNoteIds = (clone $saleNotesValid)->pluck('id')->toArray();
+        $billingIds = (clone $billingsValid)->pluck('id')->toArray();
+        $warehouseId = (int) ($archingCash->idalmacen ?: (optional(Auth::user())->idalmacen ?: 0));
+        $archingDate = optional($archingCash->fecha_inicio)->format('Y-m-d') ?: date('Y-m-d');
+
+        $deliveryOrdersQuery = DeliveryOrder::query()
+            ->where(function ($q) use ($saleNoteIds, $billingIds, $warehouseId, $archingDate) {
+                if (!empty($saleNoteIds)) {
+                    $q->whereIn('idnotaventa', $saleNoteIds);
+                }
+                if (!empty($billingIds)) {
+                    $q->orWhereIn('idfactura', $billingIds);
+                }
+                $q->orWhere(function ($sub) use ($warehouseId, $archingDate) {
+                    $sub->when($warehouseId > 0, fn($w) => $w->where('idalmacen', $warehouseId))
+                        ->where(function ($d) use ($archingDate) {
+                            $d->whereDate('created_at', $archingDate)
+                              ->orWhereDate('fecha_programada', $archingDate)
+                              ->orWhereDate('fecha_entrega', $archingDate);
+                        });
+                });
+            });
+
+        $deliveryOrders = (clone $deliveryOrdersQuery)->get();
+        $totalOrders = $deliveryOrders->count();
+        $deliveredOrders = $deliveryOrders->where('estado', 'ENTREGADO');
+        $totalDeliveries = $deliveredOrders->count();
+        $deliveriesCollected = (float) $deliveredOrders->sum('total');
+
+        $orderIds = $deliveryOrders->pluck('id')->toArray();
+        $jugMovements = JugMovement::query()
+            ->where(function ($q) use ($orderIds, $warehouseId, $archingDate) {
+                if (!empty($orderIds)) {
+                    $q->whereIn('iddelivery_order', $orderIds);
+                }
+                $q->orWhere(function ($sub) use ($warehouseId, $archingDate) {
+                    $sub->when($warehouseId > 0, fn($w) => $w->where('idalmacen', $warehouseId))
+                        ->whereDate('fecha', $archingDate);
+                });
+            })
+            ->get();
+
+        $jugsIntact = (int) $jugMovements->sum('devueltos_intactos');
+        if ($jugsIntact === 0 && $deliveryOrders->isNotEmpty()) {
+            $jugsIntact = (int) $deliveryOrders->sum('bidones_vacios_recibidos');
+        }
+
+        $jugsDamaged = (int) $jugMovements->sum('devueltos_danados');
+        $damageCost = (float) $jugMovements->sum('costo_dano');
+        if ($jugsDamaged === 0 && $deliveryOrders->isNotEmpty()) {
+            $jugsDamaged = (int) $deliveryOrders->sum('bidones_danados_recibidos');
+            $damageCost = (float) $deliveryOrders->sum('cobro_envases_danados');
+        }
+
+        $entregadosLlenos = (int) $jugMovements->sum('entregados_llenos');
+        if ($entregadosLlenos === 0 && $deliveryOrders->isNotEmpty()) {
+            $entregadosLlenos = (int) $deliveryOrders->sum('bidones_a_entregar');
+        }
+        $jugsLoaned = max(0, $entregadosLlenos - ($jugsIntact + $jugsDamaged));
+
+        $validSaleNoteIds = (clone $saleNotesValid)->pluck('id');
+        $soldSaleNotes = $validSaleNoteIds->isNotEmpty() ? DB::table('detail_sale_notes')
+            ->join('products', 'detail_sale_notes.idproducto', '=', 'products.id')
+            ->whereIn('detail_sale_notes.idnotaventa', $validSaleNoteIds)
+            ->where(function ($q) {
+                $q->where('products.descripcion', 'LIKE', '%AGUA%')
+                  ->orWhere('products.descripcion', 'LIKE', '%BIDON%')
+                  ->orWhere('products.descripcion', 'LIKE', '%ENVASE%');
+            })
+            ->sum('detail_sale_notes.cantidad') : 0;
+
+        $validBillingIds = (clone $billingsValid)->pluck('id');
+        $soldBillings = $validBillingIds->isNotEmpty() ? DB::table('detail_billings')
+            ->join('products', 'detail_billings.idproducto', '=', 'products.id')
+            ->whereIn('detail_billings.idfacturacion', $validBillingIds)
+            ->where(function ($q) {
+                $q->where('products.descripcion', 'LIKE', '%AGUA%')
+                  ->orWhere('products.descripcion', 'LIKE', '%BIDON%')
+                  ->orWhere('products.descripcion', 'LIKE', '%ENVASE%');
+            })
+            ->sum('detail_billings.cantidad') : 0;
+
+        $jugsSold = (int) ($soldSaleNotes + $soldBillings);
+        if ($jugsSold === 0 && $deliveryOrders->isNotEmpty()) {
+            $jugsSold = (int) $deliveredOrders->sum('bidones_a_entregar');
+        }
+
         return [
             'opening_amount' => number_format((float) $archingCash->monto_inicial, 2, '.', ''),
             'sales_count' => (int) $salesCount,
             'sales_total' => number_format($salesTotal, 2, '.', ''),
+            'cash_total' => number_format($cashTotal, 2, '.', ''),
+            'digital_total' => number_format($digitalTotal, 2, '.', ''),
+            'expected_cash' => number_format($expectedCash, 2, '.', ''),
             'gross_total' => number_format($grossTotal, 2, '.', ''),
             'annulled_count' => (int) $annulledCount,
             'annulled_total' => number_format($annulledTotal, 2, '.', ''),
@@ -414,7 +661,17 @@ class ArchingCashController extends Controller
             'expenses_total' => number_format(0, 2, '.', ''),
             'expected_final' => number_format($expectedFinal, 2, '.', ''),
             'display_final' => number_format($displayFinal, 2, '.', ''),
-            'payment_summary' => $this->buildPaymentSummary($archingCash),
+            'payment_summary' => $paymentSummary,
+            // Cuadre de Bidones / Envases
+            'jugs_intact' => (int) $jugsIntact,
+            'jugs_damaged' => (int) $jugsDamaged,
+            'damage_cost' => number_format($damageCost, 2, '.', ''),
+            'jugs_loaned' => (int) $jugsLoaned,
+            'jugs_sold' => (int) $jugsSold,
+            // Operaciones / Pedidos / Repartos
+            'total_orders' => (int) $totalOrders,
+            'total_deliveries' => (int) $totalDeliveries,
+            'deliveries_collected' => number_format($deliveriesCollected, 2, '.', ''),
         ];
     }
 

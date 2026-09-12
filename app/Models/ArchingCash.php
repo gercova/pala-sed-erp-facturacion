@@ -41,4 +41,9 @@ class ArchingCash extends Model
     {
         return $this->belongsTo(User::class, 'idusuario');
     }
+
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'idalmacen');
+    }
 }
