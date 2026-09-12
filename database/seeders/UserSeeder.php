@@ -19,10 +19,10 @@ class UserSeeder extends Seeder
         $superAdmin = User::updateOrCreate(
             ['user' => 'admin'],
             [
-                'nombres' => 'KROWED NAJAR',
-                'password' => 'admin123$$.',
-                'estado' => 1,
-                'idcaja' => $defaultCashId,
+                'nombres'   => 'SUPERADMIN',
+                'password'  => 'admin123$$.',
+                'estado'    => 1,
+                'idcaja'    => $defaultCashId,
                 'idalmacen' => $primaryWarehouseId,
             ]
         );
@@ -32,10 +32,10 @@ class UserSeeder extends Seeder
         $admin = User::updateOrCreate(
             ['user' => 'testuser'],
             [
-                'nombres' => 'TEST USER',
-                'password' => 'Test1234$$.',
-                'estado' => 1,
-                'idcaja' => $defaultCashId,
+                'nombres'   => 'TEST USER',
+                'password'  => 'Test1234$$.',
+                'estado'    => 1,
+                'idcaja'    => $defaultCashId,
                 'idalmacen' => $primaryWarehouseId,
             ]
         );
@@ -45,10 +45,10 @@ class UserSeeder extends Seeder
         $vendedor = User::updateOrCreate(
             ['user' => 'ventas'],
             [
-                'nombres' => 'ADMIN VENTAS',
-                'password' => 'ventas123.',
-                'estado' => 1,
-                'idcaja' => $defaultCashId,
+                'nombres'   => 'ADMIN VENTAS',
+                'password'  => 'ventas123.',
+                'estado'    => 1,
+                'idcaja'    => $defaultCashId,
                 'idalmacen' => $primaryWarehouseId,
             ]
         );
@@ -58,10 +58,10 @@ class UserSeeder extends Seeder
         $cajero = User::updateOrCreate(
             ['user' => 'cajero'],
             [
-                'nombres' => 'CAJERO PRUEBA',
-                'password' => 'cajero123.',
-                'estado' => 1,
-                'idcaja' => $defaultCashId,
+                'nombres'   => 'CAJERO PRUEBA',
+                'password'  => 'cajero123.',
+                'estado'    => 1,
+                'idcaja'    => $defaultCashId,
                 'idalmacen' => $primaryWarehouseId,
             ]
         );
@@ -71,10 +71,10 @@ class UserSeeder extends Seeder
         $contabilidad = User::updateOrCreate(
             ['user' => 'conta'],
             [
-                'nombres' => 'CONTABILIDAD PRUEBA',
-                'password' => 'conta123.',
-                'estado' => 1,
-                'idcaja' => $defaultCashId,
+                'nombres'   => 'CONTABILIDAD PRUEBA',
+                'password'  => 'conta123.',
+                'estado'    => 1,
+                'idcaja'    => $defaultCashId,
                 'idalmacen' => $primaryWarehouseId,
             ]
         );
