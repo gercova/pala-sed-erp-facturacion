@@ -8,17 +8,15 @@
     <meta name="description" content="Sistema de Inventarios y control de Stock">
     <meta name="author" content="Devkro">
     <title>EasyStock</title>
-    <link href="{{ asset('npm/litepicker/dist/css/litepicker.css') }}" rel="stylesheet">
-    <link href="{{ asset('css/styles.css') }}" rel="stylesheet">
-    <link href="{{ asset('css/pro-ui.css') }}" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-    <link href="{{ asset('css/select2.min.css') }}" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
-
-    <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-
+    <link rel="stylesheet" href="{{ asset('npm/litepicker/dist/css/litepicker.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/styles.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pro-ui.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/toastr.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dataTables.bootstrap5.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/buttons.bootstrap5.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/remixicon.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/jquery-ui.css') }}">
     <link rel="icon" type="image/x-icon" href="{{ asset('assets/img/favicon-white.ico') }}">
     <script data-search-pseudo-elements="" defer="" src="{{ asset('ajax/libs/font-awesome/6.3.0/js/all.min.js') }}">
     </script>
@@ -76,8 +74,9 @@
     <nav class="topnav navbar navbar-expand shadow justify-content-between justify-content-sm-start navbar-light bg-white"
         id="sidenavAccordion">
         <!-- Sidenav Toggle Button-->
-        <button class="btn btn-icon btn-transparent-dark order-1 order-lg-0 me-2 ms-lg-2 me-lg-0" id="sidebarToggle"><i
-                data-feather="menu"></i></button>
+        <button class="btn btn-icon btn-transparent-dark order-1 order-lg-0 me-2 ms-lg-2 me-lg-0" id="sidebarToggle">
+            <i data-feather="menu"></i>
+        </button>
         <!-- Navbar Brand-->
         <!-- * * Tip * * You can use text or an image for your navbar brand.-->
         <!-- * * * * * * When using an image, we recommend the SVG format.-->
@@ -599,18 +598,18 @@
     </div>
     <script data-cfasync="false" src="{{ asset('cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js') }}">
     </script>
-    <script src="{{ asset('npm/bootstrap%405.2.3/dist/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ asset('npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js') }}"></script>
     <script>
-        var urlVentasMensuales = "{{ route('home.ventas_mensuales') }}";
-        var urlReporteIngresos = "{{ route('home.reporte_ingresos') }}";
-        var urlMetodosPagoVentas = "{{ route('home.metodo_pagos') }}";
+        let urlVentasMensuales = "{{ route('home.ventas_mensuales') }}";
+        let urlReporteIngresos = "{{ route('home.reporte_ingresos') }}";
+        let urlMetodosPagoVentas = "{{ route('home.metodo_pagos') }}";
     </script>
     <script src="{{ asset('js/scripts.js') }}"></script>
     <script src="{{ asset('assets/demo/chart-area-demo.js') }}"></script>
     <script src="{{ asset('assets/demo/chart-bar-demo.js') }}"></script>
     <script src="{{ asset('assets/demo/chart-pie-demo.js') }}"></script>
     <script src="{{ asset('npm/litepicker/dist/bundle.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/block-ui@2.70.1/jquery.blockUI.min.js"></script>
+    <script src="{{ asset('js/jquery.blockUI.min.js') }}"></script>
     <script src="{{ asset('js/litepicker.js') }}"></script>
     <script src="{{ asset('js/sb-customizer.js') }}"></script>
     <script src="{{ asset('js/onscan.min.js') }}"></script>
