@@ -138,40 +138,90 @@
 
         <div class="separator"></div>
 
-        <div class="section-title">Resumen general</div>
+        <div class="section-title">Resumen financiero</div>
         <table class="summary-row">
             <tr>
-                <td class="summary-label">Monto inicial</td>
+                <td class="summary-label">Monto inicial base</td>
                 <td class="summary-value">{{ $signo }} {{ number_format((float) $summary['opening_amount'], 2, '.', '') }}</td>
             </tr>
             <tr>
-                <td class="summary-label">Ventas vigentes</td>
-                <td class="summary-value">{{ $summary['sales_count'] }}</td>
-            </tr>
-            <tr>
-                <td class="summary-label">Total vendido</td>
+                <td class="summary-label">Ventas vigentes ({{ $summary['sales_count'] }})</td>
                 <td class="summary-value">{{ $signo }} {{ number_format((float) $summary['sales_total'], 2, '.', '') }}</td>
             </tr>
             <tr>
-                <td class="summary-label">Total bruto</td>
-                <td class="summary-value">{{ $signo }} {{ number_format((float) $summary['gross_total'], 2, '.', '') }}</td>
+                <td class="summary-label">Efectivo cobrado</td>
+                <td class="summary-value">{{ $signo }} {{ number_format((float) ($summary['cash_total'] ?? 0), 2, '.', '') }}</td>
             </tr>
             <tr>
-                <td class="summary-label">Anulados</td>
-                <td class="summary-value">{{ $signo }} {{ number_format((float) $summary['annulled_total'], 2, '.', '') }}</td>
+                <td class="summary-label">Cobro digital</td>
+                <td class="summary-value">{{ $signo }} {{ number_format((float) ($summary['digital_total'] ?? 0), 2, '.', '') }}</td>
             </tr>
-            <tr>
-                <td class="summary-label">Comprobantes anulados</td>
-                <td class="summary-value">{{ $summary['annulled_count'] }}</td>
-            </tr>
+            @if ((float) $summary['annulled_total'] > 0)
+                <tr>
+                    <td class="summary-label">Anulaciones ({{ $summary['annulled_count'] }})</td>
+                    <td class="summary-value">{{ $signo }} {{ number_format((float) $summary['annulled_total'], 2, '.', '') }}</td>
+                </tr>
+            @endif
         </table>
+
+        <div class="separator"></div>
+
+        <div class="section-title">Cuadre de bidones (20L)</div>
+        <table class="summary-row">
+            <tr>
+                <td class="summary-label">Aptos (Devueltos intactos)</td>
+                <td class="summary-value">{{ $summary['jugs_intact'] ?? 0 }}</td>
+            </tr>
+            <tr>
+                <td class="summary-label">Dañados (Devueltos rotos)</td>
+                <td class="summary-value">{{ $summary['jugs_damaged'] ?? 0 }}</td>
+            </tr>
+            <tr>
+                <td class="summary-label">Prestados (En clientes)</td>
+                <td class="summary-value">{{ $summary['jugs_loaned'] ?? 0 }}</td>
+            </tr>
+            <tr>
+                <td class="summary-label">Vendidos (Facturados)</td>
+                <td class="summary-value">{{ $summary['jugs_sold'] ?? 0 }}</td>
+            </tr>
+            @if (!empty($summary['damage_cost']) && (float) $summary['damage_cost'] > 0)
+                <tr>
+                    <td class="summary-label">Cobro por daños</td>
+                    <td class="summary-value">{{ $signo }} {{ number_format((float) $summary['damage_cost'], 2, '.', '') }}</td>
+                </tr>
+            @endif
+        </table>
+
+        @if (($summary['total_orders'] ?? 0) > 0 || ($summary['total_deliveries'] ?? 0) > 0)
+            <div class="separator"></div>
+
+            <div class="section-title">Operaciones / Repartos</div>
+            <table class="summary-row">
+                <tr>
+                    <td class="summary-label">Pedidos registrados</td>
+                    <td class="summary-value">{{ $summary['total_orders'] ?? 0 }}</td>
+                </tr>
+                <tr>
+                    <td class="summary-label">Entregas completadas</td>
+                    <td class="summary-value">{{ $summary['total_deliveries'] ?? 0 }}</td>
+                </tr>
+                <tr>
+                    <td class="summary-label">Recaudado en reparto</td>
+                    <td class="summary-value">{{ $signo }} {{ number_format((float) ($summary['deliveries_collected'] ?? 0), 2, '.', '') }}</td>
+                </tr>
+            </table>
+        @endif
 
         <div class="separator"></div>
 
         <div class="total-box">
             <table class="summary-row">
                 <tr>
-                    <td class="summary-label"><strong>Monto final esperado</strong></td>
+                    <td class="summary-label"><strong>Efectivo esperado</strong></td>
+                    <td class="summary-value"><strong>{{ $signo }} {{ number_format((float) ($summary['expected_cash'] ?? $summary['expected_final']), 2, '.', '') }}</strong></td>
+                </tr>
+                <tr>
+                    <td class="summary-label"><strong>Total cierre</strong></td>
                     <td class="summary-value"><strong>{{ $signo }} {{ number_format((float) $summary['display_final'], 2, '.', '') }}</strong></td>
                 </tr>
             </table>

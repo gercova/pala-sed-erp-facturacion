@@ -21,77 +21,92 @@
             z-index: 1055;
         }
 
-        .arching-open-strip {
-            border: 1px solid rgba(0, 172, 105, .14);
-            background: rgba(0, 172, 105, .06);
-            border-radius: 18px;
-            padding: 1rem 1.15rem;
-        }
-
-        .arching-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: .4rem;
-            padding: .38rem .72rem;
-            border-radius: 999px;
-            background: var(--bs-tertiary-bg);
-            color: var(--bs-secondary-color);
-            font-size: .84rem;
-            font-weight: 600;
-        }
-
-        .arching-cash-cell,
-        .arching-user-cell {
-            line-height: 1.2;
-        }
-
-        .arching-cash-name,
-        .arching-user-name {
-            font-weight: 700;
-            color: var(--bs-body-color);
-        }
-
-        .arching-cash-meta,
-        .arching-user-meta {
-            color: var(--bs-secondary-color);
-            font-size: .79rem;
-        }
-
-        .arching-money-pill {
-            display: inline-flex;
-            min-width: 118px;
-            justify-content: center;
-            align-items: center;
-            padding: .5rem .8rem;
-            border-radius: 999px;
-            background: var(--bs-tertiary-bg);
-            font-weight: 700;
-        }
-
-        .arching-kpi {
+        .reconcile-metric-card {
             border: 1px solid var(--bs-border-color);
-            border-radius: 1rem;
+            border-radius: 0.75rem;
             background: #fff;
-            padding: 1.15rem 1.2rem;
+            padding: 1.15rem 1.25rem;
             height: 100%;
         }
 
-        .arching-kpi-label {
-            color: var(--bs-secondary-color);
-            font-size: .92rem;
-            margin-bottom: .35rem;
+        .reconcile-metric-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            flex-shrink: 0;
         }
 
-        .arching-kpi-value {
-            font-size: 1.8rem;
+        .jug-stat-box {
+            border: 1px solid var(--bs-border-color);
+            border-radius: 0.5rem;
+            padding: 0.75rem 0.5rem;
+            text-align: center;
+            height: 100%;
+        }
+
+        .jug-stat-box .jug-count {
+            font-size: 1.45rem;
             font-weight: 700;
-            line-height: 1;
+            line-height: 1.1;
+            margin-bottom: 0.2rem;
+        }
+
+        .jug-stat-box .jug-label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .jug-aptos {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+            color: #166534;
+        }
+
+        .jug-danados {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #991b1b;
+        }
+
+        .jug-prestados {
+            background: #fffbeb;
+            border-color: #fde68a;
+            color: #92400e;
+        }
+
+        .jug-vendidos {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+            color: #1e40af;
+        }
+
+        .open-cash-card {
+            border: 1px solid #bbf7d0;
+            background: #f8fafc;
+            border-radius: 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .open-cash-card:hover {
+            border-color: #86efac;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .open-cash-highlight {
+            border-left: 4px solid #10b981 !important;
         }
 
         .arching-detail-grid,
         .arching-summary-grid {
             display: grid;
-            gap: .9rem;
+            gap: .85rem;
         }
 
         .arching-detail-grid {
@@ -105,9 +120,9 @@
         .arching-detail-card,
         .arching-summary-card {
             border: 1px solid var(--bs-border-color);
-            border-radius: 1rem;
+            border-radius: 0.75rem;
             background: #fff;
-            padding: 1rem 1.05rem;
+            padding: 0.95rem 1rem;
         }
 
         .arching-detail-card small,
@@ -120,12 +135,17 @@
 
         .arching-detail-card strong,
         .arching-summary-card strong {
-            font-size: 1.02rem;
+            font-size: 1.05rem;
         }
 
         .arching-summary-card.is-final {
-            background: linear-gradient(135deg, rgba(0, 172, 105, .10), rgba(0, 97, 242, .06));
-            border-color: rgba(0, 172, 105, .18);
+            background: #f0fdf4;
+            border-color: #86efac;
+        }
+
+        .arching-summary-card.is-cash {
+            background: #eff6ff;
+            border-color: #bfdbfe;
         }
 
         #table {
@@ -216,17 +236,18 @@
                 <div class="col-auto mb-3">
                     <h1 class="page-header-title">
                         <div class="page-header-icon"><i data-feather="briefcase"></i></div>
-                        Apertura y cierre de caja
+                        Arqueo, Cuadre y Operaciones de Caja
                     </h1>
+                    <div class="text-muted small mt-1">
+                        Control de turnos, reconciliación financiera, balance de bidones y verificación de cajas abiertas
+                    </div>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto mb-3">
                     <button type="button"
-                        class="btn btn-success waves-effect waves-light btn-create mb-2"
+                        class="btn btn-primary waves-effect waves-light btn-create"
                         @disabled(! $canOpenArching)>
-                        <span>
-                            <i class="ri-lock-unlock-line align-middle"></i>
-                            <span class="d-none d-sm-inline-block"> Aperturar caja</span>
-                        </span>
+                        <i class="ri-lock-unlock-line me-1"></i>
+                        <span>Aperturar nueva caja</span>
                     </button>
                 </div>
             </div>
@@ -234,84 +255,219 @@
     </div>
 </header>
 
-<div class="container-xl px-4 mt-4">
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="arching-kpi">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <div class="arching-kpi-label">Caja asignada</div>
-                        <div class="arching-kpi-value" style="font-size: 1.25rem;">
-                            {{ $assignedCash?->descripcion ?? 'Sin caja' }}
+<div class="container-xl px-4">
+    {{-- MODULO DE CUADRE Y OPERACIONES DEL DIA --}}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="ri-dashboard-line me-2 text-primary"></i>Cuadre y Conciliación del Día
+                </h5>
+                <small class="text-muted">Operaciones consolidadas del {{ date('d/m/Y') }} (Almacén: {{ $currentWarehouse?->descripcion ?? 'Todos' }})</small>
+            </div>
+            <span class="badge bg-light text-dark border px-3 py-2">
+                <i class="ri-calendar-event-line me-1 text-muted"></i>Hoy: {{ date('d/m/Y') }}
+            </span>
+        </div>
+        <div class="card-body p-4 bg-light">
+            <div class="row g-3">
+                {{-- KPI 1: Ventas Totales --}}
+                <div class="col-xl-3 col-md-6">
+                    <div class="reconcile-metric-card shadow-sm">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="text-muted small fw-semibold text-uppercase">Ventas del Día</span>
+                            <div class="reconcile-metric-icon bg-success-subtle text-success">
+                                <i class="ri-money-dollar-circle-line"></i>
+                            </div>
                         </div>
-                    </div>
-                    <div class="rounded-3 p-3" style="background: rgba(0,97,242,.10); color: var(--bs-primary);">
-                        <i class="fas fa-cash-register"></i>
+                        <div class="h3 fw-bold text-dark mb-1">
+                            {{ $signo }} {{ number_format($dailyReconciliation['sales_total'], 2) }}
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between text-muted small">
+                            <span><i class="ri-file-check-line me-1 text-success"></i>{{ $dailyReconciliation['sales_count'] }} ventas vigentes</span>
+                            @if ($dailyReconciliation['annulled_count'] > 0)
+                                <span class="text-danger fw-semibold" title="Comprobantes anulados">
+                                    <i class="ri-close-circle-line me-1"></i>{{ $dailyReconciliation['annulled_count'] }} anulación(es)
+                                </span>
+                            @endif
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="arching-kpi">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <div class="arching-kpi-label">Almacen activo</div>
-                        <div class="arching-kpi-value" style="font-size: 1.25rem;">
-                            {{ $currentWarehouse?->descripcion ?? 'No seleccionado' }}
+
+                {{-- KPI 2: Pedidos y Repartos --}}
+                <div class="col-xl-3 col-md-6">
+                    <div class="reconcile-metric-card shadow-sm">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="text-muted small fw-semibold text-uppercase">Pedidos y Repartos</span>
+                            <div class="reconcile-metric-icon bg-primary-subtle text-primary">
+                                <i class="ri-e-bike-2-line"></i>
+                            </div>
                         </div>
-                    </div>
-                    <div class="rounded-3 p-3" style="background: rgba(0,172,105,.10); color: rgba(0,172,105,1);">
-                        <i class="fas fa-warehouse"></i>
+                        <div class="h3 fw-bold text-dark mb-1">
+                            {{ $dailyReconciliation['total_deliveries'] }} / {{ $dailyReconciliation['total_orders'] }}
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between text-muted small">
+                            <span><i class="ri-checkbox-circle-line me-1 text-primary"></i>Entregas realizadas</span>
+                            <span class="fw-semibold text-dark">{{ $signo }} {{ number_format($dailyReconciliation['deliveries_total'], 2) }}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="arching-kpi">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <div class="arching-kpi-label">Estado actual</div>
-                        <div class="arching-kpi-value" style="font-size: 1.25rem;">
-                            {{ $openArching ? 'Caja abierta' : 'Lista para abrir' }}
+
+                {{-- KPI 3: Anulaciones --}}
+                <div class="col-xl-2 col-md-6">
+                    <div class="reconcile-metric-card shadow-sm">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="text-muted small fw-semibold text-uppercase">Anulaciones</span>
+                            <div class="reconcile-metric-icon bg-danger-subtle text-danger">
+                                <i class="ri-file-damage-line"></i>
+                            </div>
+                        </div>
+                        <div class="h3 fw-bold text-danger mb-1">
+                            {{ $signo }} {{ number_format($dailyReconciliation['annulled_total'], 2) }}
+                        </div>
+                        <div class="text-muted small">
+                            <span><i class="ri-alert-line me-1 text-danger"></i>{{ $dailyReconciliation['annulled_count'] }} comprobantes</span>
                         </div>
                     </div>
-                    <div class="rounded-3 p-3" style="background: rgba(232,136,0,.12); color: rgba(232,136,0,1);">
-                        <i class="fas fa-clock"></i>
+                </div>
+
+                {{-- KPI 4: Cuadre de Bidones / Envases (4 buckets) --}}
+                <div class="col-xl-4 col-md-6">
+                    <div class="reconcile-metric-card shadow-sm">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="text-muted small fw-semibold text-uppercase">Cuadre de Envases (20L)</span>
+                            <span class="badge bg-secondary-subtle text-secondary">Día actual</span>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-3">
+                                <div class="jug-stat-box jug-aptos">
+                                    <div class="jug-count">{{ $dailyReconciliation['jugs_intact'] }}</div>
+                                    <div class="jug-label">Aptos</div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="jug-stat-box jug-danados">
+                                    <div class="jug-count">{{ $dailyReconciliation['jugs_damaged'] }}</div>
+                                    <div class="jug-label">Dañados</div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="jug-stat-box jug-prestados">
+                                    <div class="jug-count">{{ $dailyReconciliation['jugs_loaned'] }}</div>
+                                    <div class="jug-label">Prestados</div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="jug-stat-box jug-vendidos">
+                                    <div class="jug-count">{{ $dailyReconciliation['jugs_sold'] }}</div>
+                                    <div class="jug-label">Vendidos</div>
+                                </div>
+                            </div>
+                        </div>
+                        @if ($dailyReconciliation['damage_cost'] > 0)
+                            <div class="mt-2 text-danger small text-end fw-semibold">
+                                Cobro por daños: {{ $signo }} {{ number_format($dailyReconciliation['damage_cost'], 2) }}
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    @if ($openArching)
-        <div class="arching-open-strip mb-4">
-            <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
-                <div>
-                    <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
-                        <span class="badge bg-success-subtle text-success">Caja abierta</span>
-                        <strong>{{ $openArching->cash?->descripcion ?? 'Caja activa' }}</strong>
-                    </div>
-                    <div class="text-muted">
-                        Responsable: <strong>{{ $openArching->user?->nombres ?? auth()->user()->nombres }}</strong>
-                        <span class="mx-2">|</span>
-                        Apertura: <strong>{{ optional($openArching->fecha_inicio)->format('d/m/Y') ?? '-' }}</strong>
-                    </div>
-                </div>
-                <div class="d-inline-flex gap-2 flex-wrap">
-                    <span class="arching-chip">{{ $currentWarehouse?->descripcion ?? 'Almacen activo' }}</span>
-                    <button type="button" class="btn btn-outline-success btn-view-summary" data-id="{{ $openArching->id }}">
-                        <i class="ri-eye-line me-1"></i>Ver resumen
-                    </button>
-                </div>
+    {{-- SECCION: VERIFICACION Y GESTION DE CAJAS ABIERTAS --}}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="ri-lock-unlock-line me-2 text-success"></i>Cajas Abiertas en Turno
+                    <span class="badge bg-success-subtle text-success ms-2">{{ $openArchings->count() }} activa(s)</span>
+                </h5>
+                <small class="text-muted">Revise y verifique los movimientos de cada caja para realizar el cuadre y proceder al cierre.</small>
             </div>
+            @if (! $assignedCash)
+                <span class="badge bg-warning-subtle text-warning border px-3 py-2">
+                    <i class="ri-alert-line me-1"></i>Sin caja física asignada a este usuario
+                </span>
+            @endif
         </div>
-    @elseif (! $assignedCash)
-        <div class="alert alert-warning border-0 mb-4">
-            Este usuario no tiene una caja asignada. Asignale una caja para poder aperturar y cerrar movimientos.
-        </div>
-    @endif
+        <div class="card-body p-3">
+            @if ($openArchings->isNotEmpty())
+                <div class="row g-3">
+                    @foreach ($openArchings as $item)
+                        @php
+                            $isMyCash = (int) $item->idusuario === (int) auth()->id();
+                        @endphp
+                        <div class="col-lg-6 col-xl-4">
+                            <div class="open-cash-card p-3 h-100 {{ $isMyCash ? 'open-cash-highlight' : '' }}">
+                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                    <div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <h6 class="fw-bold mb-0 text-dark">{{ $item->cash?->descripcion ?? 'Caja' }}</h6>
+                                            @if ($isMyCash)
+                                                <span class="badge bg-success text-white" style="font-size: 0.72rem;">Mi caja</span>
+                                            @endif
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="ri-store-2-line me-1"></i>{{ $item->warehouse?->descripcion ?? ($currentWarehouse?->descripcion ?? 'Almacén') }}
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                        <i class="ri-record-circle-line me-1"></i>Abierta
+                                    </span>
+                                </div>
 
-    <div class="card shadow-sm mb-4 arching-card">
+                                <div class="bg-white rounded p-2 border mb-3">
+                                    <div class="row g-2 text-center">
+                                        <div class="col-6 border-end">
+                                            <small class="text-muted d-block" style="font-size: 0.75rem;">Responsable</small>
+                                            <span class="fw-semibold text-dark text-truncate d-block" style="font-size: 0.85rem;" title="{{ $item->user?->nombres }}">
+                                                {{ $item->user?->nombres ?? '-' }}
+                                            </span>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted d-block" style="font-size: 0.75rem;">Monto Apertura</small>
+                                            <span class="fw-bold text-dark" style="font-size: 0.85rem;">
+                                                {{ $signo }} {{ number_format((float) $item->monto_inicial, 2) }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="text-muted text-center pt-2 mt-1 border-top" style="font-size: 0.78rem;">
+                                        <i class="ri-time-line me-1"></i>Apertura: {{ optional($item->fecha_inicio)->format('d/m/Y') }}
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary w-50 btn-view-summary" data-id="{{ $item->id }}">
+                                        <i class="ri-file-chart-line me-1"></i>Reconciliación
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger w-50 btn-prompt-close" data-id="{{ $item->id }}">
+                                        <i class="ri-lock-2-line me-1"></i>Cerrar Caja
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="text-center py-4 text-muted">
+                    <div class="mb-2">
+                        <i class="ri-checkbox-circle-fill text-success" style="font-size: 2.5rem;"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">No hay cajas abiertas en este momento</h6>
+                    <p class="small text-muted mb-0">Todas las cajas registradas se encuentran cerradas o no se ha iniciado turno.</p>
+                </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- SECCION: HISTORIAL DE ARQUEOS Y MOVIMIENTOS --}}
+    <div class="card shadow-sm mb-4 arching-card border-0">
+        <div class="card-header bg-white py-3 border-bottom">
+            <h5 class="mb-0 fw-bold text-dark">
+                <i class="ri-history-line me-2 text-primary"></i>Historial de Arqueos
+            </h5>
+        </div>
         <div class="card-body">
             <div class="table-responsive">
                 <table id="table" class="table table-hover table-sm mb-0">
