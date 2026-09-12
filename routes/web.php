@@ -333,7 +333,6 @@ Route::get('/reportes/ventas/data',             [ReportSalesController::class, '
 Route::get('/by-product',                       [ReportSalesController::class, 'salesByProductIndex'])->name('report.sales.by_product.index')->middleware(['auth', 'can:report.sales.by_product.index']);
 Route::get('/reports/sales/products',           [ReportSalesController::class, 'getSalesByProduct'])->name('report.sales.products')->middleware(['auth', 'can:report.sales.by_product.index']);
 
-
 Route::get('/reportes/pagos',                   [ReportPaymentController::class, 'index'])->name('report.payments.index')->middleware(['auth', 'can:report.payments.index']);
 Route::get('/reports/sales/payment-methods'     , [ReportPaymentController::class, 'getSalesByPaymentMethod'])->name('report.sales.payment_methods')->middleware(['auth', 'can:report.payments.index']);
 
@@ -352,7 +351,6 @@ Route::controller(BuyController::class)->prefix('buys')->middleware(['auth', 'ca
     Route::post('/store-product'            , 'store_product')->name('admin.store_product_buy');
     Route::post('/load-providers'           , 'load_providers')->name('admin.load_providers');
     Route::post('/get-product-warehouse'    , 'get_product_idwarehouse')->name('admin.get_products_by_idwarehouse_b');
-
     Route::post('/print-buy'                , 'print')->name('admin.print_buy');
     Route::get('/pdf'                       , 'test_pdf');
 });
