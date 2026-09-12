@@ -26,7 +26,9 @@ class User extends Authenticatable
         'password',
         'estado',
         'idcaja',
-        'idalmacen'
+        'idalmacen',
+        'idcliente',
+        'tipo',
     ];
 
     /**
@@ -62,5 +64,15 @@ class User extends Authenticatable
     public function warehouses()
     {
         return $this->belongsToMany(Warehouse::class, 'user_warehouse', 'user_id', 'warehouse_id')->withTimestamps();
+    }
+
+    public function clientProfile()
+    {
+        return $this->belongsTo(Client::class, 'idcliente');
+    }
+
+    public function isCliente(): bool
+    {
+        return $this->tipo === 'cliente';
     }
 }
