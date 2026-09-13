@@ -161,6 +161,7 @@ class ClientePortalController extends Controller
             $order = DeliveryOrder::create([
                 'codigo_orden'          => $orderCode,
                 'idcliente'             => $client->id,
+                'idusuario_registro'    => auth()->id(),   // usuario cliente que hizo el pedido
                 'origen'                => 'portal',
                 'estado'                => 'pendiente',
                 'direccion_entrega'     => mb_strtoupper(trim($request->input('direccion_entrega'))),
@@ -177,6 +178,7 @@ class ClientePortalController extends Controller
                 'bidones_a_entregar'    => $bidonesEntrega,
                 'notas'                 => $request->filled('notas') ? $request->input('notas') : 'Pedido desde portal de cliente.',
             ]);
+
 
             foreach ($itemsData as $iData) {
                 $iData['iddelivery_order'] = $order->id;
