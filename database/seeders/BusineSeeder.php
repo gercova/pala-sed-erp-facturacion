@@ -10,18 +10,18 @@ class BusineSeeder extends Seeder
     public function run(): void
     {
         $payload = [
-            'razon_social' => 'MYTEMS E.I.R.L.',
-            'nombre_comercial' => 'MYTEMS E.I.R.L.',
+            'razon_social' => 'INGENIERIA Y CONTROL 4.0 S.A.C.',
+            'nombre_comercial' => 'INGENIERIA Y CONTROL 4.0 S.A.C.',
             'logo' => 'logo.jpg',
             'idpais' => 1,
-            'direccion' => 'JR MANCO CAPAC 452',
+            'direccion' => 'JR. LOS PROCERES NRO. 267 URB. LOS JARDINES',
             'codigo_pais' => 'PE',
-            'ubigeo' => '220501',
+            'ubigeo' => '220901',
             'urbanizacion' => '',
             'local' => '',
             'telefono' => '950772205',
             'url_api' => 'https://facturacion.mytems.cloud/',
-            'ruc' => '20610316884',
+            'ruc' => '20613062824',
             'vencimiento_certificado' => '2025-12-06',
             'usuario_sunat' => 'MYTEMS23',
             'clave_sunat' => 'Mytems23',
@@ -38,7 +38,7 @@ class BusineSeeder extends Seeder
 
         Business::query()
             ->where('id', '!=', 1)
-            ->where('ruc', '20610316884')
+            ->where('ruc', '20613062824')
             ->update($payload);
     }
 }
