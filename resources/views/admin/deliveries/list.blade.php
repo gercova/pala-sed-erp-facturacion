@@ -115,7 +115,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold mb-1">Fecha Programada</label>
-                    <input type="date" id="filter_fecha" class="form-control form-control-sm" value="{{ date('Y-m-d') }}">
+                    <input type="date" id="filter_fecha" class="form-control form-control-sm">
                 </div>
                 <div class="col-md-3 d-flex gap-1 align-items-end mt-3 mt-md-0">
                     <button type="button" id="btn-filter" class="btn btn-primary btn-sm flex-grow-1">
