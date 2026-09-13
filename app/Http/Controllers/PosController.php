@@ -7,6 +7,7 @@ use App\Models\Billing;
 use App\Models\Business;
 use App\Models\Client;
 use App\Models\DetailBilling;
+use App\Models\DeliveryOrder;
 use App\Models\DetailPayment;
 use App\Models\DetailSaleNote;
 use App\Models\IdentityDocumentType;
@@ -50,7 +51,7 @@ class PosController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $data['signo'] = $this->signo_pais();
         $data['typeDocuments'] = IdentityDocumentType::query()
@@ -72,7 +73,18 @@ class PosController extends Controller
                 ->with('message_type', 'warning');
         }
 
-        $this->destroy_cart();
+        // Si viene desde un pedido de delivery, conservar el carrito pre-cargado.
+        // En cualquier otro caso limpiar el carrito anterior.
+        if (! $request->filled('from_delivery')) {
+            $this->destroy_cart();
+        }
+
+        // Datos de pre-carga opcionales para el JS del POS
+        $data['preload'] = [
+            'from_delivery' => $request->query('from_delivery'),
+            'tipo'          => $request->query('tipo', 'boleta'),   // boleta | factura_dni | factura_ruc
+            'client_id'     => $request->query('client_id'),
+        ];
 
         return view('admin.pos.home', $data);
     }
@@ -1274,6 +1286,22 @@ class PosController extends Controller
         }
 
         $this->destroy_cart();
+
+        // Si la venta proviene de un pedido de delivery, vincular el comprobante emitido
+        $deliveryOrderId = session('from_delivery_order_id') ?? $request->input('from_delivery');
+        if ($deliveryOrderId) {
+            $deliveryOrder = DeliveryOrder::find($deliveryOrderId);
+            if ($deliveryOrder) {
+                if ($result['document_kind'] === 'sale_note') {
+                    $deliveryOrder->idnotaventa = $result['document_id'];
+                } else {
+                    $deliveryOrder->idfactura = $result['document_id'];
+                }
+                $deliveryOrder->estado_pago = 'pagado';
+                $deliveryOrder->saveQuietly();
+            }
+            session()->forget('from_delivery_order_id');
+        }
 
         return response()->json([
             'status' => true,
