@@ -353,6 +353,29 @@
 </header>
 
 <div class="container-xl mt-4">
+    @if(!empty($preload['from_delivery']))
+    <div class="alert alert-info alert-dismissible d-flex align-items-center gap-2 mb-3 shadow-sm" role="alert">
+        <i class="ri-truck-line fs-4 text-primary"></i>
+        <div class="flex-grow-1">
+            <strong>Pedido de Reparto pre-cargado (#{{ $preload['from_delivery'] }}).</strong>
+            El carrito contiene los productos solicitados.
+            @php
+                $tipoLabels = [
+                    'boleta' => 'Boleta de Venta (DNI)',
+                    'factura_ruc' => 'Factura Electrónica (RUC)',
+                    'factura' => 'Factura Electrónica (RUC)',
+                    'factura_dni' => 'Factura Electrónica (RUC)',
+                    'nota_venta' => 'Nota de Venta'
+                ];
+            @endphp
+            Comprobante a emitir: <span class="badge bg-primary fs-6">{{ $tipoLabels[$preload['tipo']] ?? 'Boleta de Venta' }}</span>.
+        </div>
+        <button type="button" class="btn btn-sm btn-primary waves-effect d-flex align-items-center gap-1" id="btn-open-delivery-checkout">
+            <i class="ri-check-double-line"></i> Cobrar y Emitir Comprobante
+        </button>
+        <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
+    </div>
+    @endif
     <div class="row">
         <div class="col-md-8">
             <div class="card custom-card pro-card">
@@ -561,4 +584,28 @@
 @section('scripts')
     @include('admin.pos.js-home')
     @include('admin.clients.js-register')
+
+    @if(!empty($preload['from_delivery']))
+    <script>
+    window.posPreload = {
+        from_delivery: '{{ $preload["from_delivery"] }}',
+        tipo: '{{ $preload["tipo"] }}',
+        client_id: '{{ $preload["client_id"] }}',
+        docCode: '{{ ($preload["tipo"] === "factura_ruc" || $preload["tipo"] === "factura" || $preload["tipo"] === "factura_dni") ? "01" : ($preload["tipo"] === "nota_venta" ? "02" : "03") }}'
+    };
+
+    $(function () {
+        // Disparar carga de carrito
+        if (typeof load_cart === 'function') {
+            load_cart();
+        }
+
+        // Abrir modal de confirmación con datos pre-seleccionados
+        $('#btn-open-delivery-checkout').on('click', function(e) {
+            e.preventDefault();
+            $('#process-sale').click();
+        });
+    });
+    </script>
+    @endif
 @endsection

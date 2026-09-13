@@ -765,11 +765,24 @@
                 };
 
                 paymentCondition = 'contado';
-                fillDocumentTypeOptions(r.default_document_type_id || null);
+
+                // Si viene de un delivery, pre-seleccionar el tipo de comprobante solicitado
+                let targetDocId = r.default_document_type_id || null;
+                if (window.posPreload && window.posPreload.docCode) {
+                    const matched = saleDocumentTypes.find(d => String(d.codigo) === String(window.posPreload.docCode));
+                    if (matched) {
+                        targetDocId = matched.id;
+                    }
+                }
+
+                fillDocumentTypeOptions(targetDocId);
                 resetPaymentRows();
                 resetInstallmentRows();
                 $('#global-discount').val('0.00');
-                load_clients();
+
+                // Si viene de un delivery, pre-seleccionar el cliente del pedido
+                const targetClientId = (window.posPreload && window.posPreload.client_id) ? window.posPreload.client_id : null;
+                load_clients(targetClientId);
                 syncCheckoutUI();
                 $('#modalConfirmSale').modal('show');
             },
