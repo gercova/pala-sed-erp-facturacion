@@ -43,7 +43,7 @@ class DeliveryController extends Controller
 
         $repartidores = User::whereHas('roles', function ($q) {
             $q->where('name', 'REPARTIDOR');
-        })->orWhere('estado', 1)->orderBy('nombres')->get(['id', 'nombres']);
+        })->where('estado', 1)->orderBy('nombres')->get(['id', 'nombres']);
 
         $clients = Client::orderBy('nombres')->get(['id', 'nombres', 'nro_documento', 'telefono', 'direccion', 'saldo_envases']);
         $products = Product::where('opcion', 1)->orderBy('descripcion')->get();
