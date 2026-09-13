@@ -32,6 +32,11 @@ class Product extends Model
         return $this->belongsTo(Unit::class, 'idunidad');
     }
 
+    public function unidad()
+    {
+        return $this->unit();
+    }
+
     public function igvTypeAffection()
     {
         return $this->belongsTo(IgvTypeAffection::class, 'idcodigo_igv');
