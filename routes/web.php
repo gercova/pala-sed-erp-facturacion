@@ -386,6 +386,7 @@ Route::controller(DeliveryController::class)->prefix('deliveries')->middleware([
     Route::post('/cancel'                   , 'cancel')->name('deliveries.cancel');
     Route::get('/show/{id}'                 , 'show')->name('deliveries.show');
     Route::get('/qr'                        , 'qr_generator')->name('admin.deliveries.qr');
+    Route::get('/to-pos/{id}'               , 'toPOS')->name('deliveries.to_pos')->middleware('can:admin.pos');
 });
 
 # CONTROL DE ENVASES RETORNABLES Y COMODATOS
