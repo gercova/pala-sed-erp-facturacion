@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\Product;
+use App\Models\StockProduct;
 use App\Models\User;
 use App\Services\Water\JugMovementService;
 use App\Services\Water\LoyaltyService;
@@ -48,15 +49,29 @@ class DeliveryController extends Controller
         $clients = Client::orderBy('nombres')->get(['id', 'nombres', 'nro_documento', 'telefono', 'direccion', 'saldo_envases']);
         $products = Product::where('opcion', 1)->orderBy('descripcion')->get();
 
-        return view('admin.deliveries.list', compact('kpis', 'repartidores', 'clients', 'products'));
+        $user = auth()->user();
+        $canBill = $user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO', 'CONTABILIDAD', 'VENDEDOR']) || $user->can('admin.pos');
+
+        return view('admin.deliveries.list', compact('kpis', 'repartidores', 'clients', 'products', 'canBill'));
     }
 
     public function get(Request $request)
     {
         $query = DeliveryOrder::with(['cliente', 'repartidor'])
             ->select('delivery_orders.*')
-            ->orderBy('id', 'desc');
+            ->latest('id');
 
+        // Filtro por rol: Si es cliente (portal), solo ve sus propios pedidos
+        if (auth()->check() && auth()->user()->hasRole('Cliente')) {
+            $clienteId = auth()->user()->idcliente;
+            if ($clienteId) {
+                $query->where('idcliente', $clienteId);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        // Filtros opcionales
         if ($request->filled('estado')) {
             $query->where('estado', $request->input('estado'));
         }
@@ -120,7 +135,7 @@ class DeliveryController extends Controller
                     : '<span class="badge bg-light text-muted">' . ucfirst($row->origen) . '</span>';
             })
             ->addColumn('acciones', function ($row) {
-                $actions = '<div class="d-flex justify-content-center gap-1">';
+                $actions = '<div class="d-flex justify-content-center gap-1 flex-wrap">';
 
                 if ($row->estado === 'pendiente') {
                     $actions .= '<button class="btn btn-sm btn-outline-info btn-assign-driver" data-id="' . $row->id . '" data-code="' . $row->codigo_orden . '" title="Asignar repartidor y despachar"><i class="ri-truck-line"></i> Despachar</button>';
@@ -144,6 +159,31 @@ class DeliveryController extends Controller
 
                 if ($row->estado !== 'cancelado' && $row->estado !== 'entregado') {
                     $actions .= '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' . $row->id . '" title="Cancelar pedido"><i class="ri-close-line"></i></button>';
+                }
+
+                // Opción Emitir Comprobante — disponible para roles: ADMIN, SUPERADMIN, CAJERO, CONTABILIDAD, VENDEDOR
+                $user = auth()->user();
+                $canBill = $user && ($user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO', 'CONTABILIDAD', 'VENDEDOR']) || $user->can('admin.pos'));
+
+                if ($canBill) {
+                    $urlToPos = route('deliveries.to_pos', $row->id);
+
+                    $actions .= '
+                    <div class="btn-group" role="group">
+                        <a href="' . $urlToPos . '" class="btn btn-sm btn-outline-primary" title="Emitir comprobante en POS">
+                            <i class="ri-receipt-line me-1"></i> Comprobante
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="Opciones de comprobante">
+                            <span class="visually-hidden">Opciones</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            <li>
+                                <a class="dropdown-item" href="' . $urlToPos . '">
+                                    <i class="ri-shopping-cart-2-line me-2 text-primary"></i> Emitir comprobante en POS
+                                </a>
+                            </li>
+                        </ul>
+                    </div>';
                 }
 
                 $actions .= '</div>';
@@ -375,6 +415,86 @@ class DeliveryController extends Controller
         return response()->json([
             'status' => true,
             'order' => $order,
+        ]);
+    }
+
+    /**
+     * Pre-carga el carrito del POS con los items del pedido de delivery
+     * y redirige al POS para emitir boleta, factura o nota de venta.
+     */
+    public function toPOS($id)
+    {
+        $order = DeliveryOrder::with(['items.producto.unidad', 'cliente'])->findOrFail($id);
+
+        // Determinar el almacén del usuario autenticado (o el del pedido o 1)
+        $idalmacen = (int) auth()->user()->idalmacen ?: ((int) $order->idalmacen ?: 1);
+
+        // Limpiar carrito previo
+        session()->forget('pos');
+
+        $cartProducts = [];
+        $subtotal = 0;
+        $igv = 0;
+
+        // Añadir cada ítem del pedido al carrito de sesión
+        foreach ($order->items as $item) {
+            /** @var \App\Models\Product $product */
+            $product = $item->producto;
+            if (! $product) {
+                continue;
+            }
+
+            // Obtener stock actual del producto en el almacén
+            $stockRow = StockProduct::where('idproducto', $product->id)
+                ->where('idalmacen', $idalmacen)
+                ->first();
+
+            $cantidad = (int) $item->cantidad;
+            $precioVenta = (float) $item->precio_unitario;
+            $igvVal = (int) ($product->igv ?? 18);
+            $igvFactor = (100 + $igvVal) / 100;
+            $precioBase = $igvFactor > 0 ? ($precioVenta / $igvFactor) : $precioVenta;
+            $igvItem = ($precioVenta - $precioBase) * $cantidad;
+
+            $igv += round($igvItem, 2);
+            $subtotal += round($precioBase * $cantidad, 2);
+
+            $cartProducts[] = [
+                'id'             => $product->id,
+                'descripcion'    => $product->descripcion,
+                'idunidad'       => $product->idunidad,
+                'unidad'         => optional($product->unidad)->codigo ?? 'NIU',
+                'igv'            => $igvVal,
+                'idcodigo_igv'   => $product->idcodigo_igv ?? 1,
+                'precio_compra'  => $product->precio_compra,
+                'precio_venta'   => $precioVenta,
+                'stock'          => $stockRow ? (int) $stockRow->stock_actual : null,
+                'opcion'         => (int) $product->opcion,
+                'cantidad'       => $cantidad,
+                'idalmacen'      => $idalmacen,
+            ];
+        }
+
+        $total = $subtotal + $igv;
+
+        session(['pos' => [
+            'products' => $cartProducts,
+            'igv'      => $igv,
+            'subtotal' => $subtotal,
+            'total'    => $total,
+        ]]);
+
+        // Guardar ID del pedido de entrega en sesión para vincular con el comprobante al guardar venta
+        session(['from_delivery_order_id' => $order->id]);
+
+        // Pasar tipo de documento y datos del cliente como query-string
+        $tipo = request()->query('tipo', 'boleta');   // boleta | factura_ruc | nota_venta
+        $clientId = optional($order->cliente)->id;
+
+        return redirect()->route('admin.pos.create', [
+            'from_delivery' => $order->id,
+            'tipo'          => $tipo,
+            'client_id'     => $clientId,
         ]);
     }
 
