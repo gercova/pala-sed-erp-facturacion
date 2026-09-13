@@ -15,10 +15,12 @@ return new class extends Migration
             $table->id();
             $table->string('codigo_interno')->nullable();
             $table->string('codigo_barras')->nullable();
+            $table->string('codigo_sunat', 16)->nullable();
             $table->string('descripcion');
             $table->integer('idunidad')->nullable();
             $table->integer('idcategoria')->nullable();
             $table->integer('igv');
+            $table->foreignId('idcodigo_igv')->nullable()->constrained('igv_type_affections');
             $table->integer('opcion')->nullable();
             $table->decimal('precio_compra', 18, 2)->nullable();
             $table->decimal('precio_venta', 18, 2)->nullable();

@@ -13,9 +13,12 @@ return new class extends Migration
     {
         Schema::create('clients', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('iddoc')->nullable()->constrained('identity_document_types');
             $table->string('nro_documento');
             $table->string('nombres');
             $table->string('direccion');
+            $table->string('codigo_pais', 2)->nullable();
+            $table->string('ubigeo', 6)->nullable();
             $table->string('telefono')->nullable();
             $table->string('email')->nullable();
             $table->timestamps();

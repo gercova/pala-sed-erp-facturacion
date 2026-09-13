@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -15,6 +16,7 @@ return new class extends Migration
             $table->id();
             $table->integer('idcaja');
             $table->integer('idusuario');
+            $table->unsignedBigInteger('idalmacen')->nullable();
             $table->date('fecha_inicio');
             $table->date('fecha_fin')->nullable();
             $table->decimal('monto_inicial', 10 , 2);
@@ -23,6 +25,13 @@ return new class extends Migration
             $table->integer('estado');
             $table->timestamps();
         });
+
+        DB::statement('
+            UPDATE arching_cashes
+            INNER JOIN users ON users.id = arching_cashes.idusuario
+            SET arching_cashes.idalmacen = users.idalmacen
+            WHERE arching_cashes.idalmacen IS NULL
+        ');
     }
 
     /**

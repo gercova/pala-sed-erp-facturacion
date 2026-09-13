@@ -33,6 +33,7 @@ return new class extends Migration
             $table->string('conductor_documento', 20)->nullable();
             $table->string('conductor_nombre', 255)->nullable();
             $table->string('placa_vehiculo', 20)->nullable();
+            $table->string('placa_secundaria', 20)->nullable();
             $table->text('observaciones')->nullable();
             $table->string('xml', 255)->nullable();
             $table->string('cdr', 255)->nullable();

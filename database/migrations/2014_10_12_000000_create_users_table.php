@@ -18,8 +18,11 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->integer('estado');
-            $table->integer('idcaja');
-            $table->integer('idalmacen');
+            $table->unsignedBigInteger('idcaja')->nullable();
+            $table->unsignedBigInteger('idalmacen')->nullable();
+            $table->unsignedBigInteger('idcliente')->nullable();
+            $table->string('tipo', 20)->default('admin');
+            $table->foreign('idcliente')->references('id')->on('clients')->nullOnDelete();
             $table->rememberToken();
             $table->timestamps();
         });

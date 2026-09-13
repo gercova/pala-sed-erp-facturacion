@@ -18,6 +18,8 @@ return new class extends Migration
             $table->integer('idtipo_documento');
             $table->integer('idtipo_documento_relacionado')->nullable();
             $table->integer('idcaja');
+            $table->string('direccion')->nullable();
+            $table->boolean('estado')->default(true);
             $table->timestamps();
         });
     }

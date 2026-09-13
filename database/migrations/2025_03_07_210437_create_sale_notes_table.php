@@ -20,9 +20,13 @@ return new class extends Migration
             $table->date('fecha_vencimiento');
             $table->time('hora');
             $table->integer('idcliente');
+            $table->integer('modo_pago')->default(1);
             $table->decimal('subtotal', 18, 2);
             $table->decimal('igv', 18, 2);
             $table->decimal('total', 18, 2);
+            $table->decimal('monto_credito', 18, 2)->default(0);
+            $table->json('cuotas')->nullable();
+            $table->json('payment_breakdown')->nullable();
             $table->string('observaciones')->nullable();
             $table->integer('estado')->nullable();
             $table->integer('idusuario');

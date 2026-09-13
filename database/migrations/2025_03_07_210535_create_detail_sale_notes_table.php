@@ -16,6 +16,7 @@ return new class extends Migration
             $table->integer('idnotaventa');
             $table->integer('idproducto');
             $table->decimal('cantidad', 18, 2);
+            $table->decimal('descuento', 18, 2)->default(0);
             $table->decimal('igv', 18, 2);
             $table->decimal('precio_unitario', 18, 2);
             $table->decimal('precio_total', 18, 2);
