@@ -57,7 +57,8 @@ class ClientePortalController extends Controller
         $client   = $this->resolveClient($user);
         $business = Business::first();
 
-        $products = Product::where('opcion', 1)
+        $products = Product::with('unit')
+            ->where('opcion', 1)
             ->where(function ($q) {
                 $q->where('descripcion', 'LIKE', '%AGUA%')
                   ->orWhere('descripcion', 'LIKE', '%BIDON%')
@@ -69,7 +70,7 @@ class ClientePortalController extends Controller
             ->get();
 
         if ($products->isEmpty()) {
-            $products = Product::where('opcion', 1)->limit(6)->get();
+            $products = Product::with('unit')->where('opcion', 1)->limit(6)->get();
         }
 
         $loyalty    = $this->loyaltyService->getClientStatus($client);
@@ -167,7 +168,7 @@ class ClientePortalController extends Controller
                 'direccion_entrega'     => mb_strtoupper(trim($request->input('direccion_entrega'))),
                 'referencia'            => trim((string) $request->input('referencia', '')),
                 'coordenadas'           => $request->input('coordenadas'),
-                'telefono_contacto'     => $client->telefono,
+                'telefono_contacto'     => $request->input('telefono_contacto') ?: $client->telefono,
                 'fecha_programada'      => $request->input('fecha_programada'),
                 'franja_horaria'        => $request->input('franja_horaria', 'flexible'),
                 'subtotal'              => $subtotal,
@@ -178,6 +179,13 @@ class ClientePortalController extends Controller
                 'bidones_a_entregar'    => $bidonesEntrega,
                 'notas'                 => $request->filled('notas') ? $request->input('notas') : 'Pedido desde portal de cliente.',
             ]);
+
+            if ($request->filled('telefono_contacto') && $request->input('telefono_contacto') !== $client->telefono) {
+                $client->forceFill(['telefono' => $request->input('telefono_contacto')])->saveQuietly();
+            }
+            if ($request->filled('coordenadas') && empty($client->coordenadas)) {
+                $client->forceFill(['coordenadas' => $request->input('coordenadas')])->saveQuietly();
+            }
 
 
             foreach ($itemsData as $iData) {

@@ -87,13 +87,6 @@
             <span>EasyStock</span>
         </a>
         <!-- Navbar Search Input-->
-        <!-- * * Note: * * Visible only on and above the lg breakpoint-->
-        <form class="form-inline me-auto d-none d-lg-block me-3">
-            <div class="input-group input-group-joined input-group-solid">
-                <input class="form-control pe-0" type="search" placeholder="Buscar" aria-label="Search" readonly>
-                <div class="input-group-text"><i data-feather="search"></i></div>
-            </div>
-        </form>
         <!-- Navbar Items-->
         <ul class="navbar-nav align-items-center ms-auto">
             <!-- * * Note: * * Visible only below the lg breakpoint-->
@@ -240,18 +233,6 @@
             <nav class="sidenav shadow-right sidenav-light">
                 <div class="sidenav-menu">
                     <div class="nav accordion" id="accordionSidenav">
-                        <!-- Sidenav Menu Heading (Account)-->
-                        <!-- * * Note: * * Visible only on and above the sm breakpoint-->
-                        {{-- <div class="sidenav-menu-heading d-sm-none">Cuenta</div> --}}
-                        <!-- Sidenav Link (Alerts)-->
-                        <!-- * * Note: * * Visible only on and above the sm breakpoint-->
-                        <!-- Sidenav Link (Messages)-->
-                        <!-- * * Note: * * Visible only on and above the sm breakpoint-->
-                        {{-- <a class="nav-link d-sm-none" href="#!">
-                                <div class="nav-link-icon"><i data-feather="mail"></i></div>
-                                Messages
-                                <span class="badge bg-success-soft text-success ms-auto">2 New!</span>
-                            </a> --}}
                         <!-- Sidenav Menu Heading (Core)-->
                         <div class="sidenav-menu-heading">Menu</div>
                         @if ($canDashboard)
