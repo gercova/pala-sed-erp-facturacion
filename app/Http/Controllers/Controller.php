@@ -24,7 +24,7 @@ class Controller extends BaseController
 
     public function verify__client($dni_ruc)
     {
-        $token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ODgiLCJuYW1lIjoiTXl0ZW1zIiwiZW1haWwiOiJteXRlbXNjb250YWN0b0BnbWFpbC5jb20iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJjb25zdWx0b3IifQ.CMerOf33h1rSeWSEtfPwOv_6_vLhC0ZyhseiQs5Ba6c';
+        $token = env('API_DNI_RUC');
         $endpoint = strlen((string) $dni_ruc) === 8
             ? 'https://api.factiliza.com/pe/v1/dni/info/' . $dni_ruc
             : 'https://api.factiliza.com/pe/v1/ruc/info/' . $dni_ruc;
@@ -81,13 +81,11 @@ class Controller extends BaseController
 
     public function signo_pais() {
         $country = $this->resolveBusinessCountry();
-
         return $country?->signo ?: 'S/';
     }
 
     public function moneda_pais() {
         $country = $this->resolveBusinessCountry();
-
         return $country?->moneda ?: 'SOLES';
     }
 
@@ -96,8 +94,7 @@ class Controller extends BaseController
         return (round($numero*$factor)/$factor); 
     }
 
-    protected function currentWarehouseId(): int
-    {
+    protected function currentWarehouseId(): int {
         if (! auth()->check()) {
             return 0;
         }
@@ -105,8 +102,7 @@ class Controller extends BaseController
         return (int) (session('selected_warehouse_id') ?: auth()->user()->idalmacen ?: 0);
     }
 
-    protected function saleNotesByCurrentWarehouse()
-    {
+    protected function saleNotesByCurrentWarehouse() {
         $warehouseId = $this->currentWarehouseId();
         $query = SaleNote::query();
 
@@ -122,8 +118,7 @@ class Controller extends BaseController
         });
     }
 
-    protected function quotesByCurrentWarehouse()
-    {
+    protected function quotesByCurrentWarehouse() {
         $warehouseId = $this->currentWarehouseId();
         $query = Quote::query();
 
@@ -139,8 +134,7 @@ class Controller extends BaseController
         });
     }
 
-    protected function billingsByCurrentWarehouse()
-    {
+    protected function billingsByCurrentWarehouse() {
         $warehouseId = $this->currentWarehouseId();
         $query = Billing::query();
 
@@ -151,8 +145,7 @@ class Controller extends BaseController
         return $query->where('billings.idalmacen', $warehouseId);
     }
 
-    protected function stockProductsByCurrentWarehouse()
-    {
+    protected function stockProductsByCurrentWarehouse() {
         $warehouseId = $this->currentWarehouseId();
         $query = StockProduct::query();
 
@@ -163,8 +156,7 @@ class Controller extends BaseController
         return $query->where('idalmacen', $warehouseId);
     }
 
-    protected function transferOrdersByCurrentWarehouse()
-    {
+    protected function transferOrdersByCurrentWarehouse() {
         $warehouseId = $this->currentWarehouseId();
         $query = TransferOrder::query();
 
@@ -179,8 +171,7 @@ class Controller extends BaseController
         });
     }
 
-    private function resolveBusinessCountry(): ?Country
-    {
+    private function resolveBusinessCountry(): ?Country {
         $business = Business::query()->find(1);
 
         if ($business && $business->idpais) {
