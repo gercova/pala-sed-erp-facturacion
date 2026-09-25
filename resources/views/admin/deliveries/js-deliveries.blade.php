@@ -1,3 +1,23 @@
+<style>
+    @keyframes spin-anim {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    .spin-animation {
+        display: inline-block;
+        animation: spin-anim 0.75s linear infinite;
+    }
+    .dropdown-menu .dropdown-item {
+        transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    }
+    .dropdown-menu .dropdown-item:hover {
+        background-color: rgba(0, 97, 242, 0.08);
+    }
+    .dropdown-menu .dropdown-item.text-danger:hover {
+        background-color: rgba(220, 53, 69, 0.08);
+        color: #dc3545 !important;
+    }
+</style>
 <script>
     let tableDeliveries = null;
     const availableProducts = @json($products);
@@ -90,6 +110,31 @@
         if (typeof feather !== 'undefined') {
             feather.replace();
         }
+
+        // Sincronizar contadores KPI cuando la tabla responde
+        $('#table-deliveries').on('xhr.dt', function(e, settings, json, xhr) {
+            if (json && json.kpis) {
+                $('#kpi-pendientes').text(json.kpis.pendientes);
+                $('#kpi-en-ruta').text(json.kpis.en_ruta);
+                $('#kpi-entregados').text(json.kpis.entregados_hoy);
+                $('#kpi-recaudado').text('S/ ' + parseFloat(json.kpis.recaudado_hoy).toFixed(2));
+            }
+        });
+
+        // Botón Refrescar Tabla Manualmente
+        $('#btn-refresh-table').on('click', function() {
+            let $btn = $(this);
+            let $icon = $btn.find('i');
+            $btn.prop('disabled', true);
+            $icon.addClass('spin-animation');
+            tableDeliveries.ajax.reload(function() {
+                $btn.prop('disabled', false);
+                $icon.removeClass('spin-animation');
+                if (typeof toast_msg === 'function') {
+                    toast_msg('Bandeja de pedidos actualizada', 'info');
+                }
+            }, false);
+        });
 
         // Filtros
         $('#btn-filter').on('click', function() {

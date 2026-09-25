@@ -131,12 +131,19 @@
 
     <!-- Tabla Principal de Pedidos -->
     <div class="card mb-4">
-        <div class="card-header fw-bold text-dark d-flex justify-content-between align-items-center">
-            <span><i class="ri-list-check-2 me-1 align-middle text-primary"></i> Bandeja de Pedidos y Despacho</span>
-            <span class="small text-muted">Se actualiza automáticamente con pedidos entrantes por QR</span>
+        <div class="card-header fw-bold text-dark d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center">
+                <span><i class="ri-list-check-2 me-1 align-middle text-primary"></i> Bandeja de Pedidos y Despacho</span>
+                <span class="small text-muted ms-2 fw-normal d-none d-md-inline">| Se actualiza automáticamente con pedidos entrantes por QR</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" id="btn-refresh-table" class="btn btn-sm btn-outline-primary shadow-none" title="Refrescar datos de la tabla">
+                    <i class="ri-refresh-line me-1"></i> Refrescar
+                </button>
+            </div>
         </div>
         <div class="card-body">
-            <div class="table-responsive">
+            <div class="table-responsive" style="min-height: 320px;">
                 <table id="table-deliveries" class="table table-hover table-sm align-middle w-100">
                     <thead>
                         <tr>

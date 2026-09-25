@@ -84,7 +84,19 @@ class DeliveryController extends Controller
             $query->where('idrepartidor', $request->input('idrepartidor'));
         }
 
+        $today = Carbon::today();
+        $kpis = [
+            'pendientes' => DeliveryOrder::where('estado', 'pendiente')->count(),
+            'en_ruta' => DeliveryOrder::where('estado', 'en_ruta')->count(),
+            'entregados_hoy' => DeliveryOrder::where('estado', 'entregado')->whereDate('fecha_entrega', $today)->count(),
+            'recaudado_hoy' => (float) DeliveryOrder::where('estado', 'entregado')
+                ->whereDate('fecha_entrega', $today)
+                ->where('estado_pago', 'pagado')
+                ->sum('total'),
+        ];
+
         return DataTables::of($query)
+            ->with(['kpis' => $kpis])
             ->editColumn('fecha_programada', function ($row) {
                 $time = $row->franja_horaria ? ' (' . ucfirst($row->franja_horaria) . ')' : '';
                 return Carbon::parse($row->fecha_programada)->format('d/m/Y') . $time;
@@ -135,59 +147,78 @@ class DeliveryController extends Controller
                     : '<span class="badge bg-light text-muted">' . ucfirst($row->origen) . '</span>';
             })
             ->addColumn('acciones', function ($row) {
-                $actions = '<div class="d-flex justify-content-center gap-1 flex-wrap">';
+                $user = auth()->user();
+                $canBill = $user && ($user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO', 'CONTABILIDAD', 'VENDEDOR']) || $user->can('admin.pos'));
 
+                $items = '';
+
+                // Despachar a ruta (solo si está pendiente)
                 if ($row->estado === 'pendiente') {
-                    $actions .= '<button class="btn btn-sm btn-outline-info btn-assign-driver" data-id="' . $row->id . '" data-code="' . $row->codigo_orden . '" title="Asignar repartidor y despachar"><i class="ri-truck-line"></i> Despachar</button>';
+                    $items .= '<li>
+                        <a class="dropdown-item btn-assign-driver py-2" href="javascript:void(0);" data-id="' . $row->id . '" data-code="' . htmlspecialchars($row->codigo_orden) . '">
+                            <i class="ri-truck-line me-2 text-info align-middle"></i> Asignar y Despachar
+                        </a>
+                    </li>';
                 }
 
+                // Completar entrega (si está en ruta o pendiente)
                 if ($row->estado === 'en_ruta' || $row->estado === 'pendiente') {
-                    $actions .= '<button class="btn btn-sm btn-outline-success btn-complete-delivery" data-id="' . $row->id . '" data-code="' . $row->codigo_orden . '" data-client="' . htmlspecialchars($row->cliente?->nombres ?? '') . '" data-total="' . $row->total . '" data-delivered="' . $row->bidones_a_entregar . '" title="Completar entrega y recibir envases"><i class="ri-check-double-line"></i> Entregar</button>';
+                    $items .= '<li>
+                        <a class="dropdown-item btn-complete-delivery py-2" href="javascript:void(0);" data-id="' . $row->id . '" data-code="' . htmlspecialchars($row->codigo_orden) . '" data-client="' . htmlspecialchars($row->cliente?->nombres ?? '') . '" data-total="' . $row->total . '" data-delivered="' . $row->bidones_a_entregar . '">
+                            <i class="ri-check-double-line me-2 text-success align-middle"></i> Completar Entrega
+                        </a>
+                    </li>';
                 }
 
-                // Botón de WhatsApp
+                // Emitir Comprobante en POS
+                if ($canBill) {
+                    $urlToPos = route('deliveries.to_pos', $row->id);
+                    $items .= '<li>
+                        <a class="dropdown-item py-2" href="' . $urlToPos . '">
+                            <i class="ri-receipt-line me-2 text-primary align-middle"></i> Emitir Comprobante (POS)
+                        </a>
+                    </li>';
+                }
+
+                // Contactar por WhatsApp
                 if ($row->telefono_contacto) {
                     $cleanPhone = preg_replace('/[^0-9]/', '', $row->telefono_contacto);
                     if (strlen($cleanPhone) === 9) {
                         $cleanPhone = '51' . $cleanPhone;
                     }
                     $waText = urlencode("¡Hola! Tu pedido de agua *{$row->codigo_orden}* está en camino a {$row->direccion_entrega}. Total: S/ " . number_format($row->total, 2));
-                    $actions .= '<a href="https://wa.me/' . $cleanPhone . '?text=' . $waText . '" target="_blank" class="btn btn-sm btn-outline-success" title="Contactar por WhatsApp"><i class="ri-whatsapp-line"></i></a>';
-                }
-
-                $actions .= '<button class="btn btn-sm btn-outline-secondary btn-order-details" data-id="' . $row->id . '" title="Ver detalles"><i class="ri-file-list-line"></i></button>';
-
-                if ($row->estado !== 'cancelado' && $row->estado !== 'entregado') {
-                    $actions .= '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' . $row->id . '" title="Cancelar pedido"><i class="ri-close-line"></i></button>';
-                }
-
-                // Opción Emitir Comprobante — disponible para roles: ADMIN, SUPERADMIN, CAJERO, CONTABILIDAD, VENDEDOR
-                $user = auth()->user();
-                $canBill = $user && ($user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO', 'CONTABILIDAD', 'VENDEDOR']) || $user->can('admin.pos'));
-
-                if ($canBill) {
-                    $urlToPos = route('deliveries.to_pos', $row->id);
-
-                    $actions .= '
-                    <div class="btn-group" role="group">
-                        <a href="' . $urlToPos . '" class="btn btn-sm btn-outline-primary" title="Emitir comprobante en POS">
-                            <i class="ri-receipt-line me-1"></i> Comprobante
+                    $items .= '<li>
+                        <a class="dropdown-item py-2" href="https://wa.me/' . $cleanPhone . '?text=' . $waText . '" target="_blank">
+                            <i class="ri-whatsapp-line me-2 text-success align-middle"></i> Contactar por WhatsApp
                         </a>
-                        <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="Opciones de comprobante">
-                            <span class="visually-hidden">Opciones</span>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                            <li>
-                                <a class="dropdown-item" href="' . $urlToPos . '">
-                                    <i class="ri-shopping-cart-2-line me-2 text-primary"></i> Emitir comprobante en POS
-                                </a>
-                            </li>
-                        </ul>
-                    </div>';
+                    </li>';
                 }
 
-                $actions .= '</div>';
-                return $actions;
+                // Ver detalles (siempre disponible)
+                $items .= '<li>
+                    <a class="dropdown-item btn-order-details py-2" href="javascript:void(0);" data-id="' . $row->id . '">
+                        <i class="ri-file-list-line me-2 text-secondary align-middle"></i> Ver Detalles
+                    </a>
+                </li>';
+
+                // Cancelar pedido (si no está cancelado ni entregado)
+                if ($row->estado !== 'cancelado' && $row->estado !== 'entregado') {
+                    $items .= '<li><hr class="dropdown-divider my-1"></li>';
+                    $items .= '<li>
+                        <a class="dropdown-item btn-cancel-order text-danger py-2" href="javascript:void(0);" data-id="' . $row->id . '">
+                            <i class="ri-close-circle-line me-2 text-danger align-middle"></i> Cancelar Pedido
+                        </a>
+                    </li>';
+                }
+
+                return '<div class="dropdown text-center">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle waves-effect shadow-none" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="ri-more-2-fill me-1 align-middle"></i> Acciones
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="font-size: 0.85rem; min-width: 195px;">
+                        ' . $items . '
+                    </ul>
+                </div>';
             })
             ->rawColumns(['cliente', 'direccion_entrega', 'envases_badge', 'repartidor', 'estado', 'total', 'origen', 'acciones'])
             ->make(true);
