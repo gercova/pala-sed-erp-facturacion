@@ -1,100 +1,278 @@
-/* ── Timeline ── */
-.timeline {
-    position: relative;
-    padding-left: 2.5rem;
+/* ═════════════════════════════════════════════════════════════
+   Seguimiento de Pedido — Client Portal
+═════════════════════════════════════════════════════════════ */
+
+/* ── Modern Stepper ── */
+.order-stepper-wrapper {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem 1.25rem 1.25rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e2e8f0;
 }
 
-.timeline::before {
-    content: '';
+.order-stepper {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+    padding: 0 .75rem;
+}
+
+.order-stepper-line-bg {
     position: absolute;
-    left: .9rem;
-    top: 1.5rem;
-    bottom: 1.5rem;
-    width: 2px;
-    background: #e3e7ef;
+    top: 24px;
+    left: 10%;
+    right: 10%;
+    height: 4px;
+    background: #e2e8f0;
+    z-index: 1;
     border-radius: 2px;
 }
 
-.tl-item {
-    position: relative;
-    padding: .1rem 0 1.5rem 1rem;
-}
-
-.tl-item:last-child {
-    padding-bottom: 0;
-}
-
-.tl-dot {
+.order-stepper-line-fill {
     position: absolute;
-    left: -1.65rem;
-    top: .2rem;
-    width: 22px;
-    height: 22px;
+    top: 24px;
+    left: 10%;
+    height: 4px;
+    background: #16a34a;
+    z-index: 2;
+    border-radius: 2px;
+    transition: width 0.4s ease;
+}
+
+.stepper-step {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex: 1;
+}
+
+.step-circle {
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    border: 2px solid #e3e7ef;
-    background: #f8fafc;
+    background: #ffffff;
+    border: 3px solid #cbd5e1;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: .65rem;
+    font-size: 1.25rem;
     color: #94a3b8;
-    transition: all .3s;
+    margin-bottom: .6rem;
+    transition: all 0.3s ease;
 }
 
-.tl-item.done .tl-dot {
+/* Step states */
+.stepper-step.done .step-circle {
     background: #16a34a;
     border-color: #16a34a;
-    color: #fff;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
 }
 
-.tl-item.active .tl-dot {
+.stepper-step.active .step-circle {
     background: #0b5ed7;
     border-color: #0b5ed7;
-    color: #fff;
-    animation: pulse 1.5s infinite;
+    color: #ffffff;
+    box-shadow: 0 0 0 5px rgba(11, 94, 215, 0.15);
 }
 
-.tl-item.pending .tl-dot {
+.stepper-step.pending .step-circle {
     background: #f8fafc;
     border-color: #cbd5e1;
     color: #94a3b8;
 }
 
-@keyframes pulse {
-
-    0%,
-    100% {
-        box-shadow: 0 0 0 0 rgba(11, 94, 215, .3);
-    }
-
-    50% {
-        box-shadow: 0 0 0 6px rgba(11, 94, 215, 0);
-    }
-}
-
-.tl-title {
-    font-size: .9rem;
-    font-weight: 600;
+.step-title {
+    font-size: .88rem;
+    font-weight: 700;
     color: #1e293b;
-    margin-bottom: .15rem;
+    margin: 0 0 .25rem 0;
 }
 
-.tl-title.muted {
-    color: #94a3b8;
+.stepper-step.pending .step-title {
+    color: #64748b;
 }
 
-.tl-time {
-    font-size: .78rem;
-    color: #94a3b8;
+.step-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    font-size: .72rem;
+    font-weight: 600;
+    padding: .2rem .55rem;
+    border-radius: 20px;
+    line-height: 1.2;
+    margin-bottom: .25rem;
 }
 
-/* ── Detail table ── */
+.step-badge.done {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.step-badge.active {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+}
+
+.step-badge.pending {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
+.step-desc {
+    font-size: .75rem;
+    color: #64748b;
+    max-width: 170px;
+    line-height: 1.35;
+    margin: 0;
+}
+
+/* ── Status Banner ── */
+.status-banner {
+    padding: 1.1rem 1.25rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.status-banner.pendiente {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+}
+
+.status-banner.en_ruta {
+    background: #f0fdfa;
+    border: 1px solid #99f6e4;
+    color: #0f766e;
+}
+
+.status-banner.entregado {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+.status-banner.cancelado {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+
+.status-banner-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.status-banner.pendiente .status-banner-icon { color: #0b5ed7; }
+.status-banner.en_ruta .status-banner-icon { color: #0d9488; }
+.status-banner.entregado .status-banner-icon { color: #16a34a; }
+.status-banner.cancelado .status-banner-icon { color: #dc2626; }
+
+.status-banner-text h5 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 .2rem 0;
+}
+
+.status-banner-text p {
+    font-size: .83rem;
+    margin: 0;
+    opacity: 0.9;
+}
+
+/* ── Driver Box ── */
+.driver-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: .85rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+}
+
+.driver-info {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+.driver-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #0b5ed7;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* ── Items Table ── */
+.items-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .85rem;
+    margin-top: .5rem;
+}
+
+.items-table th {
+    background: #f8fafc;
+    padding: .6rem .75rem;
+    font-weight: 600;
+    color: #64748b;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    text-transform: uppercase;
+    font-size: .72rem;
+    letter-spacing: .03em;
+}
+
+.items-table td {
+    padding: .75rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    vertical-align: middle;
+}
+
+.items-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* ── Detail Row ── */
 .detail-row {
     display: flex;
     justify-content: space-between;
-    padding: .45rem 0;
+    align-items: flex-start;
+    padding: .5rem 0;
     border-bottom: 1px solid #f1f5f9;
-    font-size: .875rem;
+    font-size: .86rem;
+    gap: .5rem;
 }
 
 .detail-row:last-child {
@@ -103,10 +281,97 @@
 
 .detail-label {
     color: #64748b;
+    font-size: .82rem;
+    flex-shrink: 0;
 }
 
 .detail-value {
     font-weight: 600;
     color: #1e293b;
     text-align: right;
+    word-break: break-word;
+}
+
+/* ── Badges de estado ── */
+.badge-estado {
+    padding: .25rem .65rem;
+    border-radius: 20px;
+    font-size: .75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+}
+
+.badge-pendiente {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+}
+
+.badge-en_ruta,
+.badge-en_camino {
+    background: #f0fdfa;
+    color: #0f766e;
+    border: 1px solid #99f6e4;
+}
+
+.badge-entregado {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.badge-cancelado {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+/* ── Responsive adjustments ── */
+@media (max-width: 640px) {
+    .order-stepper {
+        flex-direction: column;
+        gap: 1.25rem;
+        padding-left: 2.75rem;
+    }
+
+    .order-stepper-line-bg {
+        top: 24px;
+        bottom: 24px;
+        left: 23px;
+        width: 4px;
+        height: auto;
+        right: auto;
+    }
+
+    .order-stepper-line-fill {
+        top: 24px;
+        left: 23px;
+        width: 4px;
+        height: auto;
+        right: auto;
+    }
+
+    .stepper-step {
+        flex-direction: row;
+        gap: 1rem;
+        text-align: left;
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .step-circle {
+        margin-bottom: 0;
+        margin-left: -2.75rem;
+        flex-shrink: 0;
+    }
+
+    .step-info {
+        align-items: flex-start;
+    }
+
+    .step-desc {
+        max-width: none;
+    }
 }
