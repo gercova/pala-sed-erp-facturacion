@@ -142,15 +142,15 @@
                 </h5>
 
                 <div class="mb-3">
-                    <label class="form-label small fw-bold">Número de Teléfono / WhatsApp <span class="text-danger">*</span></label>
+                    <label class="form-label small fw-bold">DNI o Teléfono Celular <span class="text-danger">*</span></label>
                     <div class="input-group">
-                        <span class="input-group-text bg-light"><i class="ri-phone-fill"></i></span>
-                        <input type="tel" id="input_phone" name="telefono" class="form-control" placeholder="Ej. 999 999 999" required>
+                        <span class="input-group-text bg-light"><i class="ri-user-search-line"></i></span>
+                        <input type="text" id="input_phone" name="telefono" class="form-control" placeholder="Ingresa tu DNI (8 dígitos) o Teléfono" required>
                         <button type="button" class="btn btn-outline-primary" id="btn-search-client">
-                            <i class="ri-search-line"></i> Buscar
+                            <i class="ri-search-line"></i> Identificarme
                         </button>
                     </div>
-                    <small class="text-muted" style="font-size: 11px;">Si ya has comprado con nosotros, cargaremos tu dirección automáticamente.</small>
+                    <small class="text-muted" style="font-size: 11px;">Si ya compraste antes, tu dirección y datos se cargarán automáticamente.</small>
                 </div>
 
                 <!-- Notificación de Reconocimiento y Fidelidad -->
@@ -163,13 +163,19 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label small fw-bold">Nombre Completo o Empresa <span class="text-danger">*</span></label>
-                    <input type="text" id="input_name" name="nombres" class="form-control" placeholder="Tu nombre y apellido" required>
+                    <label class="form-label small fw-bold">DNI (8 dígitos) <span class="text-muted fw-normal">(Para boleta y promociones)</span></label>
+                    <div class="input-group">
+                        <input type="text" id="input_dni" name="nro_documento" class="form-control" placeholder="Ej. 42156789" maxlength="8">
+                        <button type="button" class="btn btn-outline-secondary" id="btn-reniec-qr" title="Consultar RENIEC para autocompletar nombre">
+                            <i class="ri-id-card-line"></i> <span id="btn-reniec-qr-text">RENIEC</span>
+                        </button>
+                    </div>
+                    <small id="reniec-qr-feedback" class="d-none text-muted" style="font-size: 11px;"></small>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label small fw-bold">DNI o RUC <span class="text-muted fw-normal">(Opcional)</span></label>
-                    <input type="text" id="input_dni" name="nro_documento" class="form-control" placeholder="Para boleta o factura">
+                    <label class="form-label small fw-bold">Nombre Completo o Empresa <span class="text-danger">*</span></label>
+                    <input type="text" id="input_name" name="nombres" class="form-control" placeholder="Tu nombre y apellido" required>
                 </div>
 
                 <!-- Enviar a otra dirección (para clientes reconocidos) -->
@@ -188,9 +194,20 @@
                     <input type="text" id="input_address" name="direccion" class="form-control" placeholder="Av. / Jr. / Calle y Nro. Interior/Dpto." required>
                 </div>
 
-                <div class="mb-2">
-                    <label class="form-label small fw-bold">Referencia de Llegada</label>
-                    <input type="text" id="input_reference" name="referencia" class="form-control" placeholder="Frente a la tienda / Timbre blanco">
+                <div class="row g-2 mb-2">
+                    <div class="col-sm-7">
+                        <label class="form-label small fw-bold">Referencia de Llegada</label>
+                        <input type="text" id="input_reference" name="referencia" class="form-control" placeholder="Frente a la tienda / Timbre blanco">
+                    </div>
+                    <div class="col-sm-5">
+                        <label class="form-label small fw-bold">GPS (Coordenadas)</label>
+                        <div class="input-group">
+                            <input type="text" id="input_coordenadas" name="coordenadas" class="form-control form-control-sm" placeholder="-6.4852,-76.3682">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-get-gps-qr" title="Obtener coordenadas actuales">
+                                <i class="ri-crosshair-2-line"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -413,7 +430,7 @@
             $('#btn-search-client').on('click', function() {
                 let search = $('#input_phone').val().trim();
                 if (!search) {
-                    Swal.fire('Atención', 'Ingresa tu número de celular.', 'warning');
+                    Swal.fire('Atención', 'Ingresa tu DNI o número de celular.', 'warning');
                     return;
                 }
 
@@ -428,8 +445,12 @@
                             if (c.nro_documento && !c.nro_documento.startsWith('GEN-')) {
                                 $('#input_dni').val(c.nro_documento);
                             }
+                            if (c.telefono) {
+                                $('#input_phone').val(c.telefono);
+                            }
                             $('#input_address').val(c.direccion).data('original-address', c.direccion);
                             $('#input_reference').val(c.referencia || '').data('original-reference', c.referencia || '');
+                            $('#input_coordenadas').val(c.coordenadas || '');
                             $('#wrapper-otra-direccion').removeClass('d-none');
                             $('#check_otra_direccion').prop('checked', false);
 
@@ -450,9 +471,62 @@
                             $('#check_otra_direccion').prop('checked', false);
                             clientEligibleForFree = false;
                             calculateTotals();
+                            Swal.fire('Cliente nuevo', r.msg || 'Completa tus datos para registrar tu primer pedido.', 'info');
                         }
+                    },
+                    error: function(xhr) {
+                        Swal.fire('Atención', xhr.responseJSON?.msg || 'Error al verificar datos.', 'warning');
                     }
                 });
+            });
+
+            // Consulta RENIEC para autocompletar nombre en QR
+            $('#btn-reniec-qr').on('click', function() {
+                let dni = $('#input_dni').val().trim();
+                if (!/^\d{8}$/.test(dni)) {
+                    Swal.fire('Atención', 'Ingresa un DNI válido de 8 dígitos para consultar en RENIEC.', 'warning');
+                    return;
+                }
+                $('#btn-reniec-qr-text').text('Buscando...');
+                $.ajax({
+                    url: "{{ route('public.order.consultar_dni') }}",
+                    method: "POST",
+                    data: { _token: "{{ csrf_token() }}", dni: dni },
+                    success: function(r) {
+                        $('#btn-reniec-qr-text').text('RENIEC');
+                        if (r.status && r.nombres) {
+                            $('#input_name').val(r.nombres);
+                            $('#reniec-qr-feedback').removeClass('d-none text-warning').addClass('text-success').text('Nombre autocompletado con RENIEC.');
+                        } else {
+                            $('#reniec-qr-feedback').removeClass('d-none text-success').addClass('text-warning').text(r.msg || 'No se pudo obtener el nombre.');
+                        }
+                    },
+                    error: function(xhr) {
+                        $('#btn-reniec-qr-text').text('RENIEC');
+                        $('#reniec-qr-feedback').removeClass('d-none text-success').addClass('text-warning').text(xhr.responseJSON?.msg || 'Error al consultar DNI.');
+                    }
+                });
+            });
+
+            // Obtener ubicación GPS en QR
+            $('#btn-get-gps-qr').on('click', function() {
+                if (!navigator.geolocation) {
+                    Swal.fire('No soportado', 'La geolocalización no está disponible en este dispositivo.', 'warning');
+                    return;
+                }
+                const btn = $(this);
+                btn.prop('disabled', true);
+                navigator.geolocation.getCurrentPosition(
+                    function(pos) {
+                        btn.prop('disabled', false);
+                        $('#input_coordenadas').val(pos.coords.latitude.toFixed(6) + ',' + pos.coords.longitude.toFixed(6));
+                    },
+                    function() {
+                        btn.prop('disabled', false);
+                        Swal.fire('Ubicación no disponible', 'Por favor activa el GPS en tu dispositivo.', 'warning');
+                    },
+                    { enableHighAccuracy: true, timeout: 8000 }
+                );
             });
 
             // Toggle para enviar a otra dirección

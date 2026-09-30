@@ -9,9 +9,12 @@ use App\Models\DeliveryOrderItem;
 use App\Models\IdentityDocumentType;
 use App\Models\Product;
 use App\Services\Water\LoyaltyService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class PublicQrOrderController extends Controller
 {
@@ -46,7 +49,7 @@ class PublicQrOrderController extends Controller
         return view('public.order_qr', compact('business', 'waterProducts', 'promotion'));
     }
 
-    public function check_client(Request $request)
+    public function check_client(Request $request): JsonResponse
     {
         $term = trim((string) $request->input('search'));
 
@@ -54,15 +57,40 @@ class PublicQrOrderController extends Controller
             return response()->json(['status' => false, 'msg' => 'Ingresa tu número de teléfono o documento.'], 422);
         }
 
-        $client = Client::where('telefono', $term)
-            ->orWhere('nro_documento', $term)
+        // Rate limiting por IP y por identificador para proteger contra scraping
+        $ipKey = 'qr_check_ip:'.$request->ip();
+        $termKey = 'qr_check_term:'.Str::lower($term);
+
+        if (RateLimiter::tooManyAttempts($ipKey, 20)) {
+            $seconds = RateLimiter::availableIn($ipKey);
+
+            return response()->json([
+                'status' => false,
+                'msg' => "Demasiados intentos. Intente nuevamente en {$seconds} segundos.",
+            ], 429);
+        }
+
+        if (RateLimiter::tooManyAttempts($termKey, 5)) {
+            $seconds = RateLimiter::availableIn($termKey);
+
+            return response()->json([
+                'status' => false,
+                'msg' => "Demasiados intentos. Intente nuevamente en {$seconds} segundos.",
+            ], 429);
+        }
+
+        RateLimiter::hit($ipKey, 60);
+        RateLimiter::hit($termKey, 300);
+
+        $client = Client::where('nro_documento', $term)
+            ->orWhere('telefono', $term)
             ->first();
 
         if (! $client) {
             return response()->json([
-                'status' => false,
+                'status' => true,
                 'found' => false,
-                'msg' => 'Cliente nuevo. Por favor completa tus datos para la entrega.',
+                'msg' => 'Cliente no registrado. Complete sus datos para su primer pedido.',
             ]);
         }
 
@@ -78,9 +106,73 @@ class PublicQrOrderController extends Controller
                 'telefono' => $client->telefono,
                 'direccion' => $client->direccion,
                 'referencia' => $client->referencia,
-                'saldo_envases' => $client->saldo_envases,
+                'coordenadas' => $client->coordenadas,
+                'saldo_envases' => (int) $client->saldo_envases,
             ],
             'loyalty' => $loyaltyStatus,
+        ]);
+    }
+
+    public function consultDni(Request $request): JsonResponse
+    {
+        $dni = trim((string) $request->input('dni', ''));
+
+        if (! preg_match('/^\d{8}$/', $dni)) {
+            return response()->json([
+                'status' => false,
+                'msg' => 'Para DNI debe ingresar exactamente 8 dígitos numéricos.',
+            ], 422);
+        }
+
+        $ipThrottleKey = 'qr_reniec_ip:'.$request->ip();
+        $dniThrottleKey = 'qr_reniec_dni:'.$dni;
+
+        if (RateLimiter::tooManyAttempts($ipThrottleKey, 15)) {
+            $seconds = RateLimiter::availableIn($ipThrottleKey);
+
+            return response()->json([
+                'status' => false,
+                'msg' => "Demasiadas consultas. Intente nuevamente en {$seconds} segundos.",
+            ], 429);
+        }
+
+        if (RateLimiter::tooManyAttempts($dniThrottleKey, 5)) {
+            $seconds = RateLimiter::availableIn($dniThrottleKey);
+
+            return response()->json([
+                'status' => false,
+                'msg' => "Demasiadas consultas. Intente nuevamente en {$seconds} segundos.",
+            ], 429);
+        }
+
+        RateLimiter::hit($ipThrottleKey, 60);
+        RateLimiter::hit($dniThrottleKey, 300);
+
+        $document = $this->verify__client($dni);
+
+        if (! isset($document->status) || (int) $document->status !== 200) {
+            return response()->json([
+                'status' => false,
+                'msg' => 'No se pudo consultar el documento. Puede ingresar su nombre manualmente.',
+                'found' => false,
+            ], 200);
+        }
+
+        $data = $document->data ?? null;
+        if (! $data) {
+            return response()->json([
+                'status' => false,
+                'msg' => 'No se encontró información para el documento consultado.',
+                'found' => false,
+            ], 200);
+        }
+
+        $names = trim(($data->nombres ?? '').' '.($data->apellido_paterno ?? '').' '.($data->apellido_materno ?? ''));
+
+        return response()->json([
+            'status' => true,
+            'found' => true,
+            'nombres' => $names,
         ]);
     }
 
@@ -89,9 +181,10 @@ class PublicQrOrderController extends Controller
         $validator = Validator::make($request->all(), [
             'nombres' => 'required|string|max:255',
             'telefono' => 'required|string|max:30',
-            'nro_documento' => 'nullable|string|max:20',
+            'nro_documento' => 'nullable|string|regex:/^\d{8}$/',
             'direccion' => 'required|string|max:255',
             'referencia' => 'nullable|string|max:255',
+            'coordenadas' => 'nullable|string|max:100',
             'fecha_programada' => 'required|date|after_or_equal:today',
             'franja_horaria' => 'nullable|string|max:50',
             'metodo_pago' => 'required|string|max:50',
@@ -100,6 +193,8 @@ class PublicQrOrderController extends Controller
             'items.*.idproducto' => 'required|exists:products,id',
             'items.*.cantidad' => 'required|numeric|min:1',
             'enviar_otra_direccion' => 'nullable|boolean',
+        ], [
+            'nro_documento.regex' => 'El DNI debe contener exactamente 8 dígitos numéricos.',
         ]);
 
         if ($validator->fails()) {
@@ -113,14 +208,17 @@ class PublicQrOrderController extends Controller
         return DB::transaction(function () use ($request) {
             $phone = trim((string) $request->input('telefono'));
             $dni = trim((string) $request->input('nro_documento'));
+            $coordenadas = trim((string) $request->input('coordenadas'));
+            $referencia = trim((string) $request->input('referencia'));
+            $direccion = trim((string) $request->input('direccion'));
 
-            // Buscar cliente existente por teléfono o documento, o crear nuevo
+            // Buscar cliente existente por documento o teléfono, o registrar nuevo
             $client = null;
-            if (! empty($phone)) {
-                $client = Client::where('telefono', $phone)->first();
-            }
-            if (! $client && ! empty($dni)) {
+            if (! empty($dni)) {
                 $client = Client::where('nro_documento', $dni)->first();
+            }
+            if (! $client && ! empty($phone)) {
+                $client = Client::where('telefono', $phone)->first();
             }
 
             $docType = IdentityDocumentType::where('codigo', '1')->first() ?? IdentityDocumentType::first();
@@ -130,26 +228,24 @@ class PublicQrOrderController extends Controller
                     'iddoc' => $docType?->id ?? 1,
                     'nro_documento' => ! empty($dni) ? $dni : ('GEN-'.time()),
                     'nombres' => mb_strtoupper(trim((string) $request->input('nombres'))),
-                    'direccion' => mb_strtoupper(trim((string) $request->input('direccion'))),
-                    'referencia' => trim((string) $request->input('referencia')),
+                    'direccion' => mb_strtoupper($direccion),
+                    'referencia' => $referencia,
+                    'coordenadas' => $coordenadas,
                     'telefono' => $phone,
                     'codigo_pais' => 'PE',
                     'saldo_envases' => 0,
                 ]);
             } else {
-                $isAlternateAddress = (bool) $request->input('enviar_otra_direccion', false);
-
-                // Si no es dirección alternativa, actualizar dirección principal del cliente
-                if (! $isAlternateAddress) {
-                    $client->update([
-                        'nombres' => mb_strtoupper(trim((string) $request->input('nombres'))),
-                        'direccion' => mb_strtoupper(trim((string) $request->input('direccion'))),
-                        'referencia' => trim((string) $request->input('referencia')),
-                    ]);
-                } else {
-                    $client->update([
-                        'nombres' => mb_strtoupper(trim((string) $request->input('nombres'))),
-                    ]);
+                // Si el cliente no tenía coordenadas o referencia guardada, completarlas
+                $updates = [];
+                if (empty($client->coordenadas) && ! empty($coordenadas)) {
+                    $updates['coordenadas'] = $coordenadas;
+                }
+                if (empty($client->referencia) && ! empty($referencia)) {
+                    $updates['referencia'] = $referencia;
+                }
+                if (! empty($updates)) {
+                    $client->update($updates);
                 }
             }
 
@@ -209,8 +305,9 @@ class PublicQrOrderController extends Controller
                 'idcliente' => $client->id,
                 'origen' => 'qr',
                 'estado' => 'pendiente',
-                'direccion_entrega' => $request->input('direccion') ?: $request->input('direccion_entrega'),
-                'referencia' => $request->input('referencia'),
+                'direccion_entrega' => $direccion,
+                'referencia' => $referencia,
+                'coordenadas' => $coordenadas ?: $client->coordenadas,
                 'telefono_contacto' => $phone,
                 'fecha_programada' => $request->input('fecha_programada'),
                 'franja_horaria' => $request->input('franja_horaria', 'flexible'),

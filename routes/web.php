@@ -49,6 +49,7 @@ Route::get('/', [LoginController::class, 'index'])->name('login')->middleware('g
 Route::controller(LoginController::class)->prefix('login')->group(function () {
     Route::post('/login', 'login')->name('login.login');
     Route::post('/register', 'register')->name('login.register')->middleware('guest');
+    Route::post('/consultar-dni', 'consultDni')->name('login.consultar_dni');
     Route::get('/logout', 'logout')->name('login.logout');
 });
 
@@ -368,6 +369,7 @@ Route::controller(BuyController::class)->prefix('buys')->middleware(['auth', 'ca
 Route::controller(PublicQrOrderController::class)->prefix('pedido')->group(function () {
     Route::get('/', 'index')->name('public.order.index');
     Route::post('/check-client', 'check_client')->name('public.order.check_client');
+    Route::post('/consultar-dni', 'consultDni')->name('public.order.consultar_dni');
     Route::post('/store', 'store')->name('public.order.store');
     Route::get('/seguimiento/{code}', 'tracking')->name('public.order.tracking');
 });

@@ -27,11 +27,18 @@
                 @endif
             </div>
 
-            <!-- Global alert -->
+            <!-- Global alerts -->
             @if (session('message'))
                 <div class="auth-alert danger" role="alert">
                     <i class="fas fa-circle-exclamation"></i>
                     <span>{{ session('message') }}</span>
+                </div>
+            @endif
+
+            @if (session('message_info'))
+                <div class="auth-alert info" role="alert" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">
+                    <i class="fas fa-info-circle"></i>
+                    <span>{{ session('message_info') }}</span>
                 </div>
             @endif
 
@@ -44,7 +51,7 @@
                     <i class="fas fa-sign-in-alt me-1"></i> Iniciar Sesión
                 </button>
                 <button
-                    class="auth-tab {{ old('active_tab', session('active_tab')) === 'register' || $errors->hasAny(['reg_iddoc', 'reg_nro_doc', 'reg_nombres', 'reg_telefono', 'reg_ubigeo', 'reg_direccion', 'reg_password']) ? 'active' : '' }}"
+                    class="auth-tab {{ old('active_tab', session('active_tab')) === 'register' || $errors->hasAny(['reg_nro_doc', 'reg_nombres', 'reg_telefono', 'reg_direccion', 'reg_password']) ? 'active' : '' }}"
                     id="tab-register" role="tab" aria-controls="pane-register" aria-selected="false"
                     onclick="switchTab('register')">
                     <i class="fas fa-user-plus me-1"></i> Registrarse
@@ -52,40 +59,75 @@
             </div>
 
             <!-- ══ TAB: LOGIN ════════════════════════════════════════════════ -->
-            <div class="tab-pane {{ old('active_tab', session('active_tab')) === 'register' || $errors->hasAny(['reg_iddoc', 'reg_nro_doc', 'reg_nombres', 'reg_telefono', 'reg_ubigeo', 'reg_direccion', 'reg_password']) ? '' : 'active' }}"
+            <div class="tab-pane {{ old('active_tab', session('active_tab')) === 'register' || $errors->hasAny(['reg_nro_doc', 'reg_nombres', 'reg_telefono', 'reg_direccion', 'reg_password']) ? '' : 'active' }}"
                 id="pane-login" role="tabpanel">
 
                 <h2 style="font-size:1.4rem; font-weight:700; color:#212529; margin:0 0 .3rem;">Bienvenido</h2>
-                <p style="font-size:.875rem; color:#6c757d; margin:0 0 1.5rem;">Ingresa tus credenciales para continuar.
+                <p style="font-size:.875rem; color:#6c757d; margin:0 0 1.5rem;">
+                    @if(session('otp_step'))
+                        Ingresa el código de 6 dígitos que enviamos para acceder.
+                    @else
+                        Ingresa tus credenciales para continuar.
+                    @endif
                 </p>
 
                 <form method="POST" action="{{ route('login.login') }}" novalidate id="form-login">
                     @csrf
-                    <div class="form-group">
-                        <label for="user" class="form-label">Usuario</label>
-                        <input id="user" type="text" name="user" autocomplete="username" autofocus
-                            class="form-control" placeholder="Tu nombre de usuario y/o DNI"
-                            value="{{ old('user') }}">
-                    </div>
 
-                    <div class="form-group">
-                        <label for="password" class="form-label">Contraseña</label>
-                        <div class="input-group">
-                            <input id="password" type="password" name="password" autocomplete="current-password"
-                                class="form-control" placeholder="••••••••">
-                            <button type="button" class="toggle-pass" onclick="togglePass('password', this)">
-                                <i class="fas fa-eye"></i>
-                            </button>
+                    @if(session('otp_step'))
+                        <input type="hidden" name="user" value="{{ old('user', session('pending_user_dni', '')) }}">
+                        <input type="hidden" name="otp_user_id" value="{{ session('otp_user_id') }}">
+
+                        <div class="form-group mb-3">
+                            <label for="otp_code" class="form-label fw-bold">Código de 6 dígitos (OTP) <span class="text-danger">*</span></label>
+                            <input id="otp_code" type="text" name="otp_code" autocomplete="one-time-code" autofocus
+                                class="form-control text-center fs-3 fw-bold" placeholder="000000" maxlength="6" pattern="\d{6}" required>
+                            <small class="text-muted d-block text-center mt-1">El código expira en 5 minutos.</small>
+
+                            @if(session('otp_wa_url'))
+                                <div class="text-center mt-3">
+                                    <a href="{{ session('otp_wa_url') }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                        <i class="fab fa-whatsapp me-1"></i> Ver código en WhatsApp
+                                    </a>
+                                </div>
+                            @endif
                         </div>
-                        @if(config('erp.client_login_mode') === 'id_only')
-                            <small class="text-muted d-block mt-1" style="font-size:11px;">
-                                <i class="fas fa-info-circle text-info"></i> Acceso rápido para clientes disponible: Puedes ingresar solo con tu DNI.
-                            </small>
-                        @endif
-                    </div>
+                    @else
+                        <div class="form-group">
+                            <label for="user" class="form-label">Usuario o DNI</label>
+                            <input id="user" type="text" name="user" autocomplete="username" autofocus
+                                class="form-control" placeholder="Tu DNI o nombre de usuario"
+                                value="{{ old('user') }}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password" class="form-label">
+                                Contraseña
+                                @if(($clientAuthMethod ?? 'password') === 'dni')
+                                    <span class="badge bg-light text-primary border ms-1" style="font-size:10px;">Opcional para clientes</span>
+                                @endif
+                            </label>
+                            <div class="input-group">
+                                <input id="password" type="password" name="password" autocomplete="current-password"
+                                    class="form-control" placeholder="{{ ($clientAuthMethod ?? 'password') === 'dni' ? 'Solo si eres operador interno' : '••••••••' }}">
+                                <button type="button" class="toggle-pass" onclick="togglePass('password', this)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            @if(($clientAuthMethod ?? 'password') === 'dni')
+                                <small class="text-muted d-block mt-1" style="font-size:11px;">
+                                    <i class="fas fa-bolt text-warning"></i> Modo acceso rápido activo: Clientes pueden acceder solo con su DNI.
+                                </small>
+                            @elseif(($clientAuthMethod ?? 'password') === 'otp')
+                                <small class="text-muted d-block mt-1" style="font-size:11px;">
+                                    <i class="fas fa-shield-alt text-info"></i> Modo OTP: Clientes recibirán un código temporal por WhatsApp.
+                                </small>
+                            @endif
+                        </div>
+                    @endif
 
                     <button type="submit" class="btn-auth" id="btn-login" style="margin-top:1rem;">
-                        <span>Acceder</span>
+                        <span>{{ session('otp_step') ? 'Validar Código' : 'Acceder' }}</span>
                         <i class="fas fa-arrow-right" style="font-size:.85rem;"></i>
                     </button>
                 </form>
@@ -101,102 +143,109 @@
             </div>
 
             <!-- ══ TAB: REGISTRO ════════════════════════════════════════════ -->
-            <div class="tab-pane {{ old('active_tab', session('active_tab')) === 'register' || $errors->hasAny(['reg_iddoc', 'reg_nro_doc', 'reg_nombres', 'reg_telefono', 'reg_ubigeo', 'reg_direccion', 'reg_password']) ? 'active' : '' }}"
+            <div class="tab-pane {{ old('active_tab', session('active_tab')) === 'register' || $errors->hasAny(['reg_nro_doc', 'reg_nombres', 'reg_telefono', 'reg_direccion', 'reg_password']) ? 'active' : '' }}"
                 id="pane-register" role="tabpanel">
 
                 <h2 style="font-size:1.4rem; font-weight:700; color:#212529; margin:0 0 .3rem;">Crear cuenta</h2>
-                <p style="font-size:.875rem; color:#6c757d; margin:0 0 1.5rem;">Regístrate para hacer pedidos en línea y
-                    acumular promociones.</p>
+                <p style="font-size:.875rem; color:#6c757d; margin:0 0 1.5rem;">Regístrate con tu DNI para hacer pedidos en línea y acumular promociones.</p>
 
                 <form method="POST" action="{{ route('login.register') }}" novalidate id="form-register">
                     @csrf
 
-                    <!-- Tipo doc + Nro doc -->
-                    <div class="form-row cols-2">
-                        <div>
-                            <label for="reg_iddoc" class="form-label">Tipo de Doc.</label>
-                            <select id="reg_iddoc" name="reg_iddoc"
-                                class="form-select {{ $errors->has('reg_iddoc') ? 'is-invalid' : '' }}">
-                                <option value="">— Seleccionar —</option>
-                                @foreach ($docTypes ?? [] as $dt)
-                                    <option value="{{ $dt->id }}"
-                                        {{ old('reg_iddoc') == $dt->id ? 'selected' : '' }}>
-                                        {{ $dt->codigo }} — {{ $dt->descripcion_documento }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('reg_iddoc')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div>
-                            <label for="reg_nro_doc" class="form-label">Nro. Documento</label>
+                    <!-- DNI con Validación de 8 dígitos y Búsqueda RENIEC -->
+                    <div class="form-group">
+                        <label for="reg_nro_doc" class="form-label">DNI (8 dígitos) <span class="text-danger">*</span></label>
+                        <div class="input-group">
                             <input id="reg_nro_doc" type="text" name="reg_nro_doc"
                                 class="form-control {{ $errors->has('reg_nro_doc') ? 'is-invalid' : '' }}"
-                                placeholder="Ej. 42156789" value="{{ old('reg_nro_doc') }}" maxlength="20">
-                            @error('reg_nro_doc')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                                placeholder="Ej. 42156789" value="{{ old('reg_nro_doc') }}" maxlength="8" pattern="\d{8}" required>
+                            <button type="button" class="btn btn-outline-primary" id="btn-reniec-search" title="Buscar en RENIEC">
+                                <i class="fas fa-search"></i> <span id="btn-reniec-text">RENIEC</span>
+                            </button>
                         </div>
+                        @error('reg_nro_doc')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                        <small id="reniec-feedback" class="d-none text-muted" style="font-size:11px;"></small>
                     </div>
 
-                    <!-- Nombre -->
+                    <!-- Nombre completo -->
                     <div class="form-group">
-                        <label for="reg_nombres" class="form-label">Nombre completo / Razón Social</label>
+                        <label for="reg_nombres" class="form-label">Nombre completo <span class="text-danger">*</span></label>
                         <input id="reg_nombres" type="text" name="reg_nombres"
                             class="form-control {{ $errors->has('reg_nombres') ? 'is-invalid' : '' }}"
-                            placeholder="Juan Pérez García" value="{{ old('reg_nombres') }}" maxlength="255">
+                            placeholder="Juan Pérez García" value="{{ old('reg_nombres') }}" maxlength="255" required>
                         @error('reg_nombres')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
 
-                    <!-- Teléfono -->
+                    <!-- Teléfono / Celular -->
                     <div class="form-group">
-                        <label for="reg_telefono" class="form-label">Teléfono / Celular</label>
+                        <label for="reg_telefono" class="form-label">Teléfono / WhatsApp <span class="text-danger">*</span></label>
                         <input id="reg_telefono" type="tel" name="reg_telefono"
                             class="form-control {{ $errors->has('reg_telefono') ? 'is-invalid' : '' }}"
-                            placeholder="942 123 456" value="{{ old('reg_telefono') }}" maxlength="15">
+                            placeholder="942 123 456" value="{{ old('reg_telefono') }}" maxlength="15" required>
                         @error('reg_telefono')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
 
-                    <!-- Ubigeo + Dirección -->
+                    <!-- Distrito + Dirección -->
                     <div class="form-row cols-2">
                         <div>
                             <label for="reg_ubigeo" class="form-label">Distrito</label>
                             <select id="reg_ubigeo" name="reg_ubigeo"
                                 class="form-select {{ $errors->has('reg_ubigeo') ? 'is-invalid' : '' }}">
-                                <option value="">— Seleccionar —</option>
-                                <option value="220601" {{ old('reg_ubigeo') === '220601' ? 'selected' : '' }}>Tarapoto
-                                </option>
-                                <option value="220602" {{ old('reg_ubigeo') === '220602' ? 'selected' : '' }}>Morales
-                                </option>
-                                <option value="220603" {{ old('reg_ubigeo') === '220603' ? 'selected' : '' }}>La Banda
-                                    de Shilcayo</option>
-                                <option value="220609" {{ old('reg_ubigeo') === '220609' ? 'selected' : '' }}>Shapaja
-                                </option>
+                                <option value="220601" {{ old('reg_ubigeo', '220601') === '220601' ? 'selected' : '' }}>Tarapoto</option>
+                                <option value="220602" {{ old('reg_ubigeo') === '220602' ? 'selected' : '' }}>Morales</option>
+                                <option value="220603" {{ old('reg_ubigeo') === '220603' ? 'selected' : '' }}>La Banda de Shilcayo</option>
+                                <option value="220609" {{ old('reg_ubigeo') === '220609' ? 'selected' : '' }}>Shapaja</option>
                             </select>
-                            @error('reg_ubigeo')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
                         </div>
                         <div>
-                            <label for="reg_direccion" class="form-label">Dirección</label>
+                            <label for="reg_direccion" class="form-label">Dirección de entrega <span class="text-danger">*</span></label>
                             <input id="reg_direccion" type="text" name="reg_direccion"
                                 class="form-control {{ $errors->has('reg_direccion') ? 'is-invalid' : '' }}"
-                                placeholder="Jr. Lima 123" value="{{ old('reg_direccion') }}" maxlength="255">
+                                placeholder="Jr. Lima 123" value="{{ old('reg_direccion') }}" maxlength="255" required>
                             @error('reg_direccion')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
                     </div>
 
+                    <!-- Referencia + Coordenadas GPS -->
+                    <div class="form-row cols-2">
+                        <div>
+                            <label for="reg_referencia" class="form-label">Referencia</label>
+                            <input id="reg_referencia" type="text" name="reg_referencia"
+                                class="form-control" placeholder="Frente al parque / Portón blanco"
+                                value="{{ old('reg_referencia') }}" maxlength="255">
+                        </div>
+                        <div>
+                            <label for="reg_coordenadas" class="form-label">Ubicación GPS</label>
+                            <div class="input-group">
+                                <input id="reg_coordenadas" type="text" name="reg_coordenadas"
+                                    class="form-control" placeholder="-6.4852,-76.3682"
+                                    value="{{ old('reg_coordenadas') }}" maxlength="100">
+                                <button type="button" class="btn btn-outline-secondary" id="btn-get-gps" title="Obtener coordenadas actuales">
+                                    <i class="fas fa-location-crosshairs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Contraseña -->
                     <div class="form-row cols-2">
                         <div>
-                            <label for="reg_password" class="form-label">Contraseña</label>
+                            <label for="reg_password" class="form-label">
+                                Contraseña
+                                @if(($clientAuthMethod ?? 'password') !== 'password')
+                                    <span class="badge bg-light text-muted border ms-1" style="font-size:10px;">Opcional</span>
+                                @else
+                                    <span class="text-danger">*</span>
+                                @endif
+                            </label>
                             <div class="input-group">
                                 <input id="reg_password" type="password" name="reg_password"
                                     class="form-control {{ $errors->has('reg_password') ? 'is-invalid' : '' }}"
@@ -214,11 +263,11 @@
                                 <div class="pass-strength-label" id="strength-label"></div>
                             </div>
                             @error('reg_password')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
                         </div>
                         <div>
-                            <label for="reg_password_confirmation" class="form-label">Confirmar</label>
+                            <label for="reg_password_confirmation" class="form-label">Confirmar Contraseña</label>
                             <div class="input-group">
                                 <input id="reg_password_confirmation" type="password"
                                     name="reg_password_confirmation" class="form-control"
@@ -258,24 +307,24 @@
             <div class="feature-item">
                 <div class="feature-icon"><i class="fas fa-user-circle"></i></div>
                 <div class="feature-text">
-                    <h6>Crea tu cuenta gratis</h6>
-                    <p>Solo necesitas tu DNI o RUC y un teléfono de contacto.</p>
+                    <h6>Crea tu cuenta con tu DNI</h6>
+                    <p>Autocompletado seguro con RENIEC y registro rápido de tu dirección.</p>
                 </div>
             </div>
 
             <div class="feature-item">
                 <div class="feature-icon"><i class="fas fa-box-open"></i></div>
                 <div class="feature-text">
-                    <h6>Haz tu pedido</h6>
-                    <p>Selecciona productos, fecha y método de pago (Efectivo, Yape, Plin).</p>
+                    <h6>Haz tu pedido habitual</h6>
+                    <p>Sin formularios repetitivos. Tu dirección se carga automáticamente.</p>
                 </div>
             </div>
 
             <div class="feature-item">
                 <div class="feature-icon"><i class="fas fa-star"></i></div>
                 <div class="feature-text">
-                    <h6>Gana promociones</h6>
-                    <p>Por cada 5 pedidos de recarga, <strong>¡el 6.º es gratis!</strong></p>
+                    <h6>Gana promociones de fidelidad</h6>
+                    <p>Acumula compras con tu DNI y obtén recargas gratis automáticas.</p>
                 </div>
             </div>
 
@@ -333,31 +382,12 @@
                 if (/[0-9]/.test(val)) score++;
                 if (/[^A-Za-z0-9]/.test(val)) score++;
 
-                const levels = [{
-                        w: '0%',
-                        bg: '#e9ecef',
-                        txt: ''
-                    },
-                    {
-                        w: '25%',
-                        bg: '#dc3545',
-                        txt: 'Débil'
-                    },
-                    {
-                        w: '50%',
-                        bg: '#fd7e14',
-                        txt: 'Regular'
-                    },
-                    {
-                        w: '75%',
-                        bg: '#ffc107',
-                        txt: 'Buena'
-                    },
-                    {
-                        w: '100%',
-                        bg: '#198754',
-                        txt: '¡Segura!'
-                    },
+                const levels = [
+                    { w: '0%', bg: '#e9ecef', txt: '' },
+                    { w: '25%', bg: '#dc3545', txt: 'Débil' },
+                    { w: '50%', bg: '#fd7e14', txt: 'Regular' },
+                    { w: '75%', bg: '#ffc107', txt: 'Buena' },
+                    { w: '100%', bg: '#198754', txt: '¡Segura!' },
                 ];
                 const lvl = val.length === 0 ? levels[0] : levels[Math.min(score, 4)];
                 fill.style.width = lvl.w;
@@ -365,6 +395,79 @@
                 label.textContent = lvl.txt;
                 label.style.color = lvl.bg;
             };
+
+            // Consulta RENIEC para autocompletar nombre
+            document.getElementById('btn-reniec-search')?.addEventListener('click', function() {
+                const dniInput = document.getElementById('reg_nro_doc');
+                const nameInput = document.getElementById('reg_nombres');
+                const feedback = document.getElementById('reniec-feedback');
+                const btnText = document.getElementById('btn-reniec-text');
+                const dni = (dniInput?.value || '').trim();
+
+                if (!/^\d{8}$/.test(dni)) {
+                    alert('Por favor ingresa un DNI válido de 8 dígitos.');
+                    dniInput?.focus();
+                    return;
+                }
+
+                if (btnText) btnText.textContent = 'Buscando...';
+
+                fetch("{{ route('login.consultar_dni') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ dni: dni })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (btnText) btnText.textContent = 'RENIEC';
+                    if (data.status && data.nombres) {
+                        if (nameInput) nameInput.value = data.nombres;
+                        if (feedback) {
+                            feedback.className = 'text-success d-block';
+                            feedback.textContent = 'Nombre autocompletado con RENIEC.';
+                        }
+                    } else {
+                        if (feedback) {
+                            feedback.className = 'text-warning d-block';
+                            feedback.textContent = data.msg || 'No se pudo obtener el nombre. Ingrésalo manualmente.';
+                        }
+                    }
+                })
+                .catch(() => {
+                    if (btnText) btnText.textContent = 'RENIEC';
+                    if (feedback) {
+                        feedback.className = 'text-warning d-block';
+                        feedback.textContent = 'No se pudo consultar el DNI en este momento.';
+                    }
+                });
+            });
+
+            // Geolocalización GPS para coordenadas
+            document.getElementById('btn-get-gps')?.addEventListener('click', function() {
+                const coordInput = document.getElementById('reg_coordenadas');
+                if (!navigator.geolocation) {
+                    alert('La geolocalización no es soportada por tu navegador.');
+                    return;
+                }
+                const btn = this;
+                btn.disabled = true;
+                navigator.geolocation.getCurrentPosition(
+                    function(pos) {
+                        btn.disabled = false;
+                        const coords = pos.coords.latitude.toFixed(6) + ',' + pos.coords.longitude.toFixed(6);
+                        if (coordInput) coordInput.value = coords;
+                    },
+                    function() {
+                        btn.disabled = false;
+                        alert('No se pudo obtener tu ubicación actual.');
+                    },
+                    { enableHighAccuracy: true, timeout: 8000 }
+                );
+            });
 
             // Loading state on submit
             document.getElementById('form-login')?.addEventListener('submit', function() {
