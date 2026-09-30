@@ -134,9 +134,28 @@
                     </div>
                 </div>
 
+                {{-- Opción: Enviar a otra dirección (sin modificar dirección registrada) --}}
+                <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:10px; padding:.75rem 1rem; margin-bottom:1.25rem;">
+                    <div class="form-check form-switch" style="display:flex; align-items:center; gap:.5rem; margin-bottom:0;">
+                        <input class="form-check-input" type="checkbox" id="check_otra_direccion" name="enviar_otra_direccion" value="1"
+                            style="cursor:pointer; width:2.2rem; height:1.2rem;" onchange="toggleAlternativeAddress(this.checked)">
+                        <label class="form-check-label" for="check_otra_direccion" style="font-weight:700; color:#1e293b; font-size:.88rem; cursor:pointer;">
+                            <i class="ri-map-pin-range-line text-primary"></i> Enviar a otra dirección para este pedido
+                        </label>
+                    </div>
+                    <small style="color:#64748b; font-size:.78rem; display:block; margin-top:.25rem;">
+                        Marca esta opción si deseas recibir este pedido en una ubicación diferente sin alterar tu dirección principal registrada.
+                    </small>
+                </div>
+
                 {{-- Dirección de entrega --}}
                 <div class="p-card-header" style="display:flex; justify-content:space-between; align-items:center;">
-                    <span><i class="ri-map-pin-2-line"></i> Dirección de Entrega</span>
+                    <span style="display:flex; align-items:center; gap:.5rem;">
+                        <i class="ri-map-pin-2-line"></i> Dirección de Entrega
+                        <span id="addr-type-badge" class="badge bg-light text-secondary border" style="font-size:.75rem;">
+                            Dirección principal registrada
+                        </span>
+                    </span>
                     <button type="button" id="btn-addr-locate" onclick="detectRealtimeLocation(true)"
                         style="background:none; border:none; color:#0b5ed7; font-size:.8rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:.3rem;"
                         title="Obtener dirección desde tu ubicación GPS">
@@ -147,7 +166,11 @@
                 <div style="margin-bottom:1rem;">
                     <label class="p-label" for="f_direccion">Dirección de entrega *</label>
                     <input type="text" class="p-input" id="f_direccion" placeholder="Ej. Jr. Lima 200, Tarapoto"
-                        value="{{ $client->direccion }}" oninput="syncAddressFromInput()">
+                        value="{{ $client->direccion }}"
+                        data-default-address="{{ $client->direccion }}"
+                        data-default-reference="{{ $client->referencia }}"
+                        data-default-coords="{{ $client->coordenadas }}"
+                        oninput="syncAddressFromInput()">
                     <div id="addr-auto-badge" class="address-autofilled-badge" style="display:none;"></div>
                 </div>
 
@@ -157,7 +180,7 @@
                         placeholder="Frente al parque, casa verde, portón negro..." value="{{ $client->referencia }}">
                 </div>
 
-                {{-- ══ MARCO DE GOOGLE MAPS CON UBICACIÓN EN TIEMPO REAL ══ --}}
+                {{-- ══ MARCO DE MAPA CON UBICACIÓN EN TIEMPO REAL ══ --}}
                 <div style="margin-bottom:1.5rem;">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.55rem;">
                         <label class="p-label" style="margin-bottom:0;">
@@ -251,6 +274,19 @@
                             <option value="tarde">Tarde (12pm – 5pm)</option>
                             <option value="flexible" selected>Flexible (cualquier hora)</option>
                         </select>
+                    </div>
+                </div>
+
+                {{-- Envases vacíos a retornar --}}
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:.85rem 1.1rem; margin-bottom:1.5rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+                        <div>
+                            <label class="p-label" for="f_envases_devolver" style="margin-bottom:.15rem; font-weight:700; color:#1e293b;">
+                                <i class="ri-recycle-line text-success"></i> Envases vacíos que retornarás
+                            </label>
+                            <small style="color:#64748b; font-size:.78rem; display:block;">Indica cuántos bidones vacíos tienes listos para entregar al chofer al momento de la entrega.</small>
+                        </div>
+                        <input type="number" class="p-input text-center" id="f_envases_devolver" min="0" value="0" style="width:85px; font-weight:700; font-size:1rem;">
                     </div>
                 </div>
 
@@ -575,19 +611,31 @@
                 zoomControl: true
             });
 
-            // Google Maps Roadmap tile layer
-            googleRoadmapLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                maxZoom: 20,
-                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                attribution: '&copy; Google Maps'
-            });
+            const mapProvider = '{{ $mapProvider ?? "osm" }}';
+            const osmTileUrl = '{{ $osmTileUrl ?? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" }}';
+            const osmAttribution = '{!! addslashes($osmAttribution ?? "&copy; OpenStreetMap contributors") !!}';
 
-            // Google Maps Satellite layer
-            googleSatelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-                maxZoom: 20,
-                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                attribution: '&copy; Google Maps'
-            });
+            if (mapProvider === 'osm') {
+                googleRoadmapLayer = L.tileLayer(osmTileUrl, {
+                    maxZoom: 19,
+                    attribution: osmAttribution
+                });
+                googleSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 19,
+                    attribution: '&copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics'
+                });
+            } else {
+                googleRoadmapLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                    attribution: '&copy; Google Maps'
+                });
+                googleSatelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                    attribution: '&copy; Google Maps'
+                });
+            }
 
             // Add default layer
             googleRoadmapLayer.addTo(map);
@@ -607,12 +655,70 @@
                 map.invalidateSize();
             }, 200);
 
+            // Guardar posición inicial por si alternan a otra dirección
+            const dirInput = document.getElementById('f_direccion');
+            if (dirInput) {
+                dirInput.dataset.defaultAddress = dirInput.value;
+                dirInput.dataset.defaultReference = document.getElementById('f_referencia')?.value || '';
+                dirInput.dataset.defaultCoords = document.getElementById('f_coordenadas')?.value || '';
+            }
+
             // If no saved coordinates, automatically trigger real-time location detection
             if (!hasSavedCoords) {
                 detectRealtimeLocation(true);
             } else {
                 // If saved coordinates exist, still try to detect GPS in background to show blue dot
                 detectRealtimeLocation(false);
+            }
+        }
+
+        /* ── Alternar entre dirección registrada y dirección alternativa ── */
+        function toggleAlternativeAddress(isAlt) {
+            const dirInput = document.getElementById('f_direccion');
+            const refInput = document.getElementById('f_referencia');
+            const coordsInput = document.getElementById('f_coordenadas');
+            const badge = document.getElementById('addr-type-badge');
+
+            if (isAlt) {
+                if (badge) {
+                    badge.textContent = 'Dirección alternativa (sólo este pedido)';
+                    badge.className = 'badge bg-warning text-dark border';
+                }
+                if (dirInput) {
+                    dirInput.dataset.savedCurrent = dirInput.value;
+                    dirInput.value = '';
+                    dirInput.placeholder = 'Ingresa la dirección alternativa para este pedido...';
+                    dirInput.focus();
+                }
+                if (refInput) {
+                    refInput.dataset.savedCurrent = refInput.value;
+                    refInput.value = '';
+                    refInput.placeholder = 'Referencia para la dirección alternativa...';
+                }
+            } else {
+                if (badge) {
+                    badge.textContent = 'Dirección principal registrada';
+                    badge.className = 'badge bg-light text-secondary border';
+                }
+                if (dirInput) {
+                    dirInput.value = dirInput.dataset.defaultAddress || dirInput.dataset.savedCurrent || '';
+                    dirInput.placeholder = 'Ej. Jr. Lima 200, Tarapoto';
+                }
+                if (refInput) {
+                    refInput.value = dirInput.dataset.defaultReference || refInput.dataset.savedCurrent || '';
+                    refInput.placeholder = 'Frente al parque, casa verde, portón negro...';
+                }
+                const defCoords = dirInput?.dataset?.defaultCoords;
+                if (defCoords && defCoords.includes(',')) {
+                    if (coordsInput) coordsInput.value = defCoords;
+                    const parts = defCoords.split(',');
+                    const pLat = parseFloat(parts[0]);
+                    const pLng = parseFloat(parts[1]);
+                    if (!isNaN(pLat) && !isNaN(pLng)) {
+                        setDeliveryPin(pLat, pLng, false);
+                        if (map) map.flyTo([pLat, pLng], 17);
+                    }
+                }
             }
         }
 
@@ -1053,10 +1159,13 @@
                 referencia: document.getElementById('f_referencia')?.value?.trim() || '',
                 coordenadas: document.getElementById('f_coordenadas')?.value || '',
                 telefono_contacto: document.getElementById('f_telefono_contacto')?.value?.trim() || '',
+                enviar_otra_direccion: document.getElementById('check_otra_direccion')?.checked ? 1 : 0,
+                envases_a_devolver: parseInt(document.getElementById('f_envases_devolver')?.value || '0', 10),
                 fecha_programada: fecha,
                 franja_horaria: document.getElementById('f_franja')?.value || 'flexible',
                 metodo_pago: selectedPay,
                 notas: document.getElementById('f_notas')?.value?.trim() || '',
+                device_timestamp: new Date().toISOString(),
                 items: Object.entries(selectedItems).map(([id, d]) => ({
                     idproducto: id,
                     cantidad: d.qty

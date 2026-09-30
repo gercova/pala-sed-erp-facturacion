@@ -35,4 +35,10 @@ return [
         'maps_api_key' => env('GOOGLE_MAPS_API_KEY', ''),
     ],
 
+    'maps' => [
+        'provider' => env('MAP_PROVIDER', 'osm'), // 'osm' | 'google_tiles' | 'google'
+        'osm_tile_url' => env('MAP_OSM_TILE_URL', 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
+        'osm_attribution' => '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        'google_api_key' => env('GOOGLE_MAPS_API_KEY', ''),
+    ],
 ];

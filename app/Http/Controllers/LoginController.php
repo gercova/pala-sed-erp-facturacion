@@ -341,8 +341,9 @@ class LoginController extends Controller
         }
 
         return DB::transaction(function () use ($request, $dni) {
+            $docType = IdentityDocumentType::where('codigo', '1')->first() ?? IdentityDocumentType::first();
             $client = Client::create([
-                'iddoc' => 1,
+                'iddoc' => $docType?->id ?? 1,
                 'nro_documento' => $dni,
                 'nombres' => mb_strtoupper(trim((string) $request->input('reg_nombres'))),
                 'telefono' => trim((string) $request->input('reg_telefono')),

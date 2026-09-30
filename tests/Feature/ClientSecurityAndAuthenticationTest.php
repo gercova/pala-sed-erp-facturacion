@@ -27,6 +27,8 @@ class ClientSecurityAndAuthenticationTest extends TestCase
 
     protected Role $adminRole;
 
+    protected int $docId;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -48,11 +50,12 @@ class ClientSecurityAndAuthenticationTest extends TestCase
             'auth_cliente_metodo' => 'password',
         ]);
 
-        IdentityDocumentType::firstOrCreate(['id' => 1], [
-            'codigo' => '1',
+        $doc = IdentityDocumentType::firstOrCreate(['codigo' => '1'], [
+            'descripcion' => 'DNI',
             'descripcion_documento' => 'DNI',
             'estado' => 1,
         ]);
+        $this->docId = (int) $doc->id;
     }
 
     /**
@@ -143,7 +146,7 @@ class ClientSecurityAndAuthenticationTest extends TestCase
         $this->business->update(['auth_cliente_metodo' => 'password']);
 
         $client = Client::create([
-            'iddoc' => 1,
+            'iddoc' => $this->docId,
             'nro_documento' => '71234567',
             'nombres' => 'CLIENTE PASSWORD TEST',
             'telefono' => '942999888',
@@ -178,7 +181,7 @@ class ClientSecurityAndAuthenticationTest extends TestCase
         $this->business->update(['auth_cliente_metodo' => 'dni']);
 
         $client = Client::create([
-            'iddoc' => 1,
+            'iddoc' => $this->docId,
             'nro_documento' => '72223334',
             'nombres' => 'CLIENTE DNI FAST TEST',
             'telefono' => '942777666',
@@ -248,7 +251,7 @@ class ClientSecurityAndAuthenticationTest extends TestCase
         $this->business->update(['auth_cliente_metodo' => 'otp']);
 
         $client = Client::create([
-            'iddoc' => 1,
+            'iddoc' => $this->docId,
             'nro_documento' => '73334445',
             'nombres' => 'CLIENTE OTP TEST',
             'telefono' => '942555444',
@@ -317,7 +320,7 @@ class ClientSecurityAndAuthenticationTest extends TestCase
 
         // Case 2: DNI exists, but wrong password
         $client = Client::create([
-            'iddoc' => 1,
+            'iddoc' => $this->docId,
             'nro_documento' => '74445556',
             'nombres' => 'CLIENTE EXISTENTE',
             'telefono' => '942333222',
@@ -399,7 +402,7 @@ class ClientSecurityAndAuthenticationTest extends TestCase
 
         // 2. Client user accessing /cliente/dashboard -> ALLOWED
         $client = Client::create([
-            'iddoc' => 1,
+            'iddoc' => $this->docId,
             'nro_documento' => '75556667',
             'nombres' => 'CLIENTE VERIFICADO',
             'telefono' => '942444333',
@@ -427,7 +430,7 @@ class ClientSecurityAndAuthenticationTest extends TestCase
     public function test_subsequent_orders_qr_flow_uses_dni_only_avoiding_repetitive_forms(): void
     {
         $client = Client::create([
-            'iddoc' => 1,
+            'iddoc' => $this->docId,
             'nro_documento' => '76667778',
             'nombres' => 'ROBERTO CARLOS DIAZ',
             'telefono' => '942987654',
@@ -465,7 +468,6 @@ class ClientSecurityAndAuthenticationTest extends TestCase
             'idunidad' => $unit->id,
             'idcategoria' => 1,
             'igv' => 18,
-            'idcodigo_igv' => 1,
             'precio_compra' => 5.0,
             'precio_venta' => 14.0,
             'opcion' => 1,

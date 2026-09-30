@@ -146,7 +146,10 @@
                 <div class="small mb-1"><i class="ri-user-line text-primary me-1"></i> <strong>Cliente:</strong> {{ $order->cliente?->nombres }}</div>
                 <div class="small mb-1"><i class="ri-map-pin-line text-primary me-1"></i> <strong>Dirección:</strong> {{ $order->direccion_entrega }} {{ $order->referencia ? '(' . $order->referencia . ')' : '' }}</div>
                 <div class="small mb-1"><i class="ri-calendar-line text-primary me-1"></i> <strong>Fecha Programada:</strong> {{ $order->fecha_programada->format('d/m/Y') }} ({{ ucfirst($order->franja_horaria) }})</div>
-                <div class="small"><i class="ri-wallet-3-line text-primary me-1"></i> <strong>Pago:</strong> {{ ucfirst($order->metodo_pago) }} ({{ ucfirst($order->estado_pago) }})</div>
+                <div class="small mb-1"><i class="ri-wallet-3-line text-primary me-1"></i> <strong>Pago:</strong> {{ ucfirst($order->metodo_pago) }} ({{ ucfirst($order->estado_pago) }})</div>
+                @if($order->bidones_vacios_recibidos > 0)
+                    <div class="small"><i class="ri-recycle-line text-success me-1"></i> <strong>Envases vacíos a retornar:</strong> {{ $order->bidones_vacios_recibidos }} bidón(es)</div>
+                @endif
             </div>
 
             <!-- Resumen de Productos -->
@@ -162,6 +165,12 @@
                             <span class="fw-bold text-dark">S/ {{ number_format($item->subtotal, 2) }}</span>
                         </li>
                     @endforeach
+                    @if($order->descuento > 0)
+                        <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-light text-success fw-bold">
+                            <span>🎁 Descuento Fidelidad:</span>
+                            <span>-S/ {{ number_format($order->descuento, 2) }}</span>
+                        </li>
+                    @endif
                     <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-light fw-bold">
                         <span>Total:</span>
                         <span class="text-primary fs-5">S/ {{ number_format($order->total, 2) }}</span>

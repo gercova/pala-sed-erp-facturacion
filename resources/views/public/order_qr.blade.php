@@ -10,6 +10,9 @@
     <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS & JS for zero-cost map marker -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
         :root {
@@ -200,14 +203,28 @@
                         <input type="text" id="input_reference" name="referencia" class="form-control" placeholder="Frente a la tienda / Timbre blanco">
                     </div>
                     <div class="col-sm-5">
-                        <label class="form-label small fw-bold">GPS (Coordenadas)</label>
+                        <label class="form-label small fw-bold">GPS / Mapa</label>
                         <div class="input-group">
                             <input type="text" id="input_coordenadas" name="coordenadas" class="form-control form-control-sm" placeholder="-6.4852,-76.3682">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-get-gps-qr" title="Obtener coordenadas actuales">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-get-gps-qr" title="Obtener coordenadas GPS">
                                 <i class="ri-crosshair-2-line"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="btn-toggle-map-qr" title="Abrir / Cerrar mapa interactivo">
+                                <i class="ri-map-pin-2-line"></i>
                             </button>
                         </div>
                     </div>
+                </div>
+
+                {{-- Marco interactivo de Leaflet en QR --}}
+                <div id="qr-map-wrapper" class="d-none mt-2 mb-2 p-2 bg-light border rounded-3 position-relative">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="fw-bold text-dark"><i class="ri-map-2-line text-primary"></i> Arrastra el marcador a tu ubicación</small>
+                        <button type="button" id="btn-qr-map-locate" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 11px;">
+                            <i class="ri-crosshair-2-fill"></i> Mi ubicación
+                        </button>
+                    </div>
+                    <div id="qr-map" style="height: 190px; width: 100%; border-radius: 6px;"></div>
                 </div>
             </div>
 
@@ -273,6 +290,7 @@
                             <option value="flexible">Lo antes posible</option>
                             <option value="manana">Mañana (08:00 - 13:00)</option>
                             <option value="tarde">Tarde (14:00 - 18:00)</option>
+                            <option value="noche">Noche (18:00 - 21:00)</option>
                         </select>
                     </div>
 
@@ -508,6 +526,95 @@
                 });
             });
 
+            // Leaflet Map para QR con fallback a OSM
+            let qrMap = null;
+            let qrMarker = null;
+
+            function initQrMap() {
+                if (qrMap) {
+                    setTimeout(() => qrMap.invalidateSize(), 100);
+                    return;
+                }
+
+                let defLat = -6.4806;
+                let defLng = -76.3616;
+                let curCoords = $('#input_coordenadas').val().trim();
+                if (curCoords && curCoords.includes(',')) {
+                    let parts = curCoords.split(',');
+                    let pLat = parseFloat(parts[0]);
+                    let pLng = parseFloat(parts[1]);
+                    if (!isNaN(pLat) && !isNaN(pLng)) {
+                        defLat = pLat;
+                        defLng = pLng;
+                    }
+                }
+
+                const mapProvider = '{{ $mapProvider ?? "osm" }}';
+                const osmTileUrl = '{{ $osmTileUrl ?? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" }}';
+                const osmAttribution = '{!! addslashes($osmAttribution ?? "&copy; OpenStreetMap contributors") !!}';
+
+                qrMap = L.map('qr-map').setView([defLat, defLng], 15);
+
+                if (mapProvider === 'osm') {
+                    L.tileLayer(osmTileUrl, {
+                        maxZoom: 19,
+                        attribution: osmAttribution
+                    }).addTo(qrMap);
+                } else {
+                    L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                        maxZoom: 20,
+                        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                        attribution: '&copy; Google Maps'
+                    }).addTo(qrMap);
+                }
+
+                qrMarker = L.marker([defLat, defLng], { draggable: true }).addTo(qrMap);
+
+                qrMarker.on('dragend', function(e) {
+                    let pos = e.target.getLatLng();
+                    $('#input_coordenadas').val(pos.lat.toFixed(6) + ',' + pos.lng.toFixed(6));
+                });
+
+                qrMap.on('click', function(e) {
+                    qrMarker.setLatLng(e.latlng);
+                    $('#input_coordenadas').val(e.latlng.lat.toFixed(6) + ',' + e.latlng.lng.toFixed(6));
+                });
+            }
+
+            $('#btn-toggle-map-qr').on('click', function() {
+                $('#qr-map-wrapper').toggleClass('d-none');
+                if (!$('#qr-map-wrapper').hasClass('d-none')) {
+                    initQrMap();
+                    setTimeout(() => { if (qrMap) qrMap.invalidateSize(); }, 150);
+                }
+            });
+
+            $('#btn-qr-map-locate').on('click', function() {
+                if (!navigator.geolocation) {
+                    Swal.fire('No soportado', 'La geolocalización no está disponible.', 'warning');
+                    return;
+                }
+                const btn = $(this);
+                btn.prop('disabled', true);
+                navigator.geolocation.getCurrentPosition(
+                    function(pos) {
+                        btn.prop('disabled', false);
+                        let lat = pos.coords.latitude;
+                        let lng = pos.coords.longitude;
+                        $('#input_coordenadas').val(lat.toFixed(6) + ',' + lng.toFixed(6));
+                        if (qrMarker && qrMap) {
+                            qrMarker.setLatLng([lat, lng]);
+                            qrMap.flyTo([lat, lng], 17);
+                        }
+                    },
+                    function() {
+                        btn.prop('disabled', false);
+                        Swal.fire('Ubicación no disponible', 'Por favor activa el GPS.', 'warning');
+                    },
+                    { enableHighAccuracy: true, timeout: 8000 }
+                );
+            });
+
             // Obtener ubicación GPS en QR
             $('#btn-get-gps-qr').on('click', function() {
                 if (!navigator.geolocation) {
@@ -519,7 +626,13 @@
                 navigator.geolocation.getCurrentPosition(
                     function(pos) {
                         btn.prop('disabled', false);
-                        $('#input_coordenadas').val(pos.coords.latitude.toFixed(6) + ',' + pos.coords.longitude.toFixed(6));
+                        let lat = pos.coords.latitude;
+                        let lng = pos.coords.longitude;
+                        $('#input_coordenadas').val(lat.toFixed(6) + ',' + lng.toFixed(6));
+                        if (qrMarker && qrMap) {
+                            qrMarker.setLatLng([lat, lng]);
+                            qrMap.panTo([lat, lng]);
+                        }
                     },
                     function() {
                         btn.prop('disabled', false);
@@ -534,11 +647,23 @@
                 if ($(this).is(':checked')) {
                     $('#input_address').val('').attr('placeholder', 'Ingresa la nueva dirección de entrega para este pedido').focus();
                     $('#input_reference').val('').attr('placeholder', 'Referencia de la nueva dirección');
+                    $('#input_coordenadas').val('');
                 } else {
                     let origAddr = $('#input_address').data('original-address') || '';
                     let origRef = $('#input_reference').data('original-reference') || '';
+                    let origCoords = $('#input_coordenadas').data('original-coords') || '';
                     $('#input_address').val(origAddr).attr('placeholder', 'Av. / Jr. / Calle y Nro. Interior/Dpto.');
                     $('#input_reference').val(origRef).attr('placeholder', 'Frente a la tienda / Timbre blanco');
+                    $('#input_coordenadas').val(origCoords);
+                    if (qrMarker && qrMap && origCoords && origCoords.includes(',')) {
+                        let parts = origCoords.split(',');
+                        let pLat = parseFloat(parts[0]);
+                        let pLng = parseFloat(parts[1]);
+                        if (!isNaN(pLat) && !isNaN(pLng)) {
+                            qrMarker.setLatLng([pLat, pLng]);
+                            qrMap.panTo([pLat, pLng]);
+                        }
+                    }
                 }
             });
 
@@ -561,6 +686,7 @@
                 }
 
                 let formData = $(this).serializeArray();
+                formData.push({ name: 'device_timestamp', value: new Date().toISOString() });
                 items.forEach((item, index) => {
                     formData.push({ name: `items[${index}][idproducto]`, value: item.idproducto });
                     formData.push({ name: `items[${index}][cantidad]`, value: item.cantidad });
