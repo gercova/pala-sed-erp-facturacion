@@ -20,6 +20,7 @@ use Yajra\DataTables\Facades\DataTables;
 class DeliveryController extends Controller
 {
     protected JugMovementService $jugService;
+
     protected LoyaltyService $loyaltyService;
 
     public function __construct(JugMovementService $jugService, LoyaltyService $loyaltyService)
@@ -98,31 +99,37 @@ class DeliveryController extends Controller
         return DataTables::of($query)
             ->with(['kpis' => $kpis])
             ->editColumn('fecha_programada', function ($row) {
-                $time = $row->franja_horaria ? ' (' . ucfirst($row->franja_horaria) . ')' : '';
-                return Carbon::parse($row->fecha_programada)->format('d/m/Y') . $time;
+                $time = $row->franja_horaria ? ' ('.ucfirst($row->franja_horaria).')' : '';
+
+                return Carbon::parse($row->fecha_programada)->format('d/m/Y').$time;
             })
             ->editColumn('cliente', function ($row) {
                 $name = $row->cliente ? $row->cliente->nombres : 'Cliente no asignado';
-                $phone = $row->telefono_contacto ? '<br><small class="text-muted"><i class="ri-phone-line"></i> ' . $row->telefono_contacto . '</small>' : '';
-                return '<div class="fw-semibold text-dark">' . htmlspecialchars($name) . '</div>' . $phone;
+                $phone = $row->telefono_contacto ? '<br><small class="text-muted"><i class="ri-phone-line"></i> '.$row->telefono_contacto.'</small>' : '';
+
+                return '<div class="fw-semibold text-dark">'.htmlspecialchars($name).'</div>'.$phone;
             })
             ->editColumn('direccion_entrega', function ($row) {
-                $ref = $row->referencia ? '<br><small class="text-muted">Ref: ' . htmlspecialchars($row->referencia) . '</small>' : '';
-                return '<span class="text-truncate d-inline-block" style="max-width: 200px;" title="' . htmlspecialchars($row->direccion_entrega) . '">' . htmlspecialchars($row->direccion_entrega) . '</span>' . $ref;
+                $ref = $row->referencia ? '<br><small class="text-muted">Ref: '.htmlspecialchars($row->referencia).'</small>' : '';
+                $mapQuery = urlencode($row->coordenadas ?: ($row->direccion_entrega.', Peru'));
+                $mapBtn = '<a href="https://www.google.com/maps/search/?api=1&query='.$mapQuery.'" target="_blank" class="btn btn-xs btn-outline-danger ms-1 p-0 px-1" title="Ver en Google Maps" style="font-size: 11px;"><i class="ri-map-pin-line"></i> Mapa</a>';
+
+                return '<span class="text-truncate d-inline-block align-middle" style="max-width: 170px;" title="'.htmlspecialchars($row->direccion_entrega).'">'.htmlspecialchars($row->direccion_entrega).'</span>'.$mapBtn.$ref;
             })
             ->addColumn('envases_badge', function ($row) {
-                $html = '<span class="badge bg-primary-soft text-primary fw-semibold">' . $row->bidones_a_entregar . ' por entregar</span>';
+                $html = '<span class="badge bg-primary-soft text-primary fw-semibold">'.$row->bidones_a_entregar.' por entregar</span>';
                 if ($row->estado === 'entregado') {
-                    $html .= '<br><small class="text-success fw-semibold">-' . $row->bidones_vacios_recibidos . ' devueltos</small>';
+                    $html .= '<br><small class="text-success fw-semibold">-'.$row->bidones_vacios_recibidos.' devueltos</small>';
                     if ($row->bidones_danados_recibidos > 0) {
-                        $html .= '<br><small class="text-danger fw-semibold">-' . $row->bidones_danados_recibidos . ' dañados</small>';
+                        $html .= '<br><small class="text-danger fw-semibold">-'.$row->bidones_danados_recibidos.' dañados</small>';
                     }
                 }
+
                 return $html;
             })
             ->editColumn('repartidor', function ($row) {
                 return $row->repartidor
-                    ? '<span class="badge bg-light text-dark"><i class="ri-user-follow-line me-1"></i> ' . htmlspecialchars($row->repartidor->nombres) . '</span>'
+                    ? '<span class="badge bg-light text-dark"><i class="ri-user-follow-line me-1"></i> '.htmlspecialchars($row->repartidor->nombres).'</span>'
                     : '<span class="badge bg-secondary-soft text-secondary">Sin asignar</span>';
             })
             ->editColumn('estado', function ($row) {
@@ -133,18 +140,20 @@ class DeliveryController extends Controller
                     'cancelado' => '<span class="badge bg-danger-soft text-danger fw-semibold"><i class="ri-close-circle-line me-1"></i> Cancelado</span>',
                     'reprogramado' => '<span class="badge bg-secondary-soft text-secondary fw-semibold"><i class="ri-calendar-line me-1"></i> Reprogramado</span>',
                 ];
-                return $badges[$row->estado] ?? '<span class="badge bg-light text-dark">' . $row->estado . '</span>';
+
+                return $badges[$row->estado] ?? '<span class="badge bg-light text-dark">'.$row->estado.'</span>';
             })
             ->editColumn('total', function ($row) {
                 $pagoBadge = $row->estado_pago === 'pagado'
                     ? '<span class="badge bg-success-soft text-success" style="font-size: 10px;">Pagado</span>'
                     : '<span class="badge bg-warning-soft text-warning" style="font-size: 10px;">Por cobrar</span>';
-                return '<strong>S/ ' . number_format($row->total, 2) . '</strong><br>' . $pagoBadge;
+
+                return '<strong>S/ '.number_format($row->total, 2).'</strong><br>'.$pagoBadge;
             })
             ->editColumn('origen', function ($row) {
                 return $row->origen === 'qr'
                     ? '<span class="badge bg-primary-soft text-primary"><i class="ri-qr-code-line"></i> QR</span>'
-                    : '<span class="badge bg-light text-muted">' . ucfirst($row->origen) . '</span>';
+                    : '<span class="badge bg-light text-muted">'.ucfirst($row->origen).'</span>';
             })
             ->addColumn('acciones', function ($row) {
                 $user = auth()->user();
@@ -155,7 +164,7 @@ class DeliveryController extends Controller
                 // Despachar a ruta (solo si está pendiente)
                 if ($row->estado === 'pendiente') {
                     $items .= '<li>
-                        <a class="dropdown-item btn-assign-driver py-2" href="javascript:void(0);" data-id="' . $row->id . '" data-code="' . htmlspecialchars($row->codigo_orden) . '">
+                        <a class="dropdown-item btn-assign-driver py-2" href="javascript:void(0);" data-id="'.$row->id.'" data-code="'.htmlspecialchars($row->codigo_orden).'">
                             <i class="ri-truck-line me-2 text-info align-middle"></i> Asignar y Despachar
                         </a>
                     </li>';
@@ -164,7 +173,7 @@ class DeliveryController extends Controller
                 // Completar entrega (si está en ruta o pendiente)
                 if ($row->estado === 'en_ruta' || $row->estado === 'pendiente') {
                     $items .= '<li>
-                        <a class="dropdown-item btn-complete-delivery py-2" href="javascript:void(0);" data-id="' . $row->id . '" data-code="' . htmlspecialchars($row->codigo_orden) . '" data-client="' . htmlspecialchars($row->cliente?->nombres ?? '') . '" data-total="' . $row->total . '" data-delivered="' . $row->bidones_a_entregar . '">
+                        <a class="dropdown-item btn-complete-delivery py-2" href="javascript:void(0);" data-id="'.$row->id.'" data-code="'.htmlspecialchars($row->codigo_orden).'" data-client="'.htmlspecialchars($row->cliente?->nombres ?? '').'" data-total="'.$row->total.'" data-delivered="'.$row->bidones_a_entregar.'">
                             <i class="ri-check-double-line me-2 text-success align-middle"></i> Completar Entrega
                         </a>
                     </li>';
@@ -174,7 +183,7 @@ class DeliveryController extends Controller
                 if ($canBill) {
                     $urlToPos = route('deliveries.to_pos', $row->id);
                     $items .= '<li>
-                        <a class="dropdown-item py-2" href="' . $urlToPos . '">
+                        <a class="dropdown-item py-2" href="'.$urlToPos.'">
                             <i class="ri-receipt-line me-2 text-primary align-middle"></i> Emitir Comprobante (POS)
                         </a>
                     </li>';
@@ -184,19 +193,27 @@ class DeliveryController extends Controller
                 if ($row->telefono_contacto) {
                     $cleanPhone = preg_replace('/[^0-9]/', '', $row->telefono_contacto);
                     if (strlen($cleanPhone) === 9) {
-                        $cleanPhone = '51' . $cleanPhone;
+                        $cleanPhone = '51'.$cleanPhone;
                     }
-                    $waText = urlencode("¡Hola! Tu pedido de agua *{$row->codigo_orden}* está en camino a {$row->direccion_entrega}. Total: S/ " . number_format($row->total, 2));
+                    $waText = urlencode("¡Hola! Tu pedido de agua *{$row->codigo_orden}* está en camino a {$row->direccion_entrega}. Total: S/ ".number_format($row->total, 2));
                     $items .= '<li>
-                        <a class="dropdown-item py-2" href="https://wa.me/' . $cleanPhone . '?text=' . $waText . '" target="_blank">
+                        <a class="dropdown-item py-2" href="https://wa.me/'.$cleanPhone.'?text='.$waText.'" target="_blank">
                             <i class="ri-whatsapp-line me-2 text-success align-middle"></i> Contactar por WhatsApp
                         </a>
                     </li>';
                 }
 
+                // Ver en Google Maps
+                $mapQuery = urlencode($row->coordenadas ?: ($row->direccion_entrega.', Peru'));
+                $items .= '<li>
+                    <a class="dropdown-item py-2" href="https://www.google.com/maps/search/?api=1&query='.$mapQuery.'" target="_blank">
+                        <i class="ri-map-pin-line me-2 text-danger align-middle"></i> Ver en Google Maps
+                    </a>
+                </li>';
+
                 // Ver detalles (siempre disponible)
                 $items .= '<li>
-                    <a class="dropdown-item btn-order-details py-2" href="javascript:void(0);" data-id="' . $row->id . '">
+                    <a class="dropdown-item btn-order-details py-2" href="javascript:void(0);" data-id="'.$row->id.'">
                         <i class="ri-file-list-line me-2 text-secondary align-middle"></i> Ver Detalles
                     </a>
                 </li>';
@@ -205,7 +222,7 @@ class DeliveryController extends Controller
                 if ($row->estado !== 'cancelado' && $row->estado !== 'entregado') {
                     $items .= '<li><hr class="dropdown-divider my-1"></li>';
                     $items .= '<li>
-                        <a class="dropdown-item btn-cancel-order text-danger py-2" href="javascript:void(0);" data-id="' . $row->id . '">
+                        <a class="dropdown-item btn-cancel-order text-danger py-2" href="javascript:void(0);" data-id="'.$row->id.'">
                             <i class="ri-close-circle-line me-2 text-danger align-middle"></i> Cancelar Pedido
                         </a>
                     </li>';
@@ -216,7 +233,7 @@ class DeliveryController extends Controller
                         <i class="ri-more-2-fill me-1 align-middle"></i> Acciones
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="font-size: 0.85rem; min-width: 195px;">
-                        ' . $items . '
+                        '.$items.'
                     </ul>
                 </div>';
             })
@@ -254,7 +271,7 @@ class DeliveryController extends Controller
 
             // Generar código de orden PED-XXXXXX
             $lastId = DeliveryOrder::max('id') ?? 0;
-            $orderCode = 'PED-' . str_pad($lastId + 1, 6, '0', STR_PAD_LEFT);
+            $orderCode = 'PED-'.str_pad($lastId + 1, 6, '0', STR_PAD_LEFT);
 
             $subtotal = 0;
             $totalDeliveredJugs = 0;
@@ -360,7 +377,7 @@ class DeliveryController extends Controller
             return response()->json(['status' => false, 'msg' => $validator->errors()->first()], 422);
         }
 
-        return DB::transaction(function () use ($request) {
+        $order = DB::transaction(function () use ($request) {
             $order = DeliveryOrder::with('items')->findOrFail($request->input('id'));
             $client = Client::findOrFail($order->idcliente);
 
@@ -407,12 +424,53 @@ class DeliveryController extends Controller
                 $this->loyaltyService->accumulatePurchases($client, $eligibleCount);
             }
 
-            return response()->json([
-                'status' => true,
-                'msg' => "¡Entrega de orden {$order->codigo_orden} completada con éxito!",
-                'type' => 'success',
-            ]);
+            return $order;
         });
+
+        // Generar enlace de comprobante por WhatsApp fuera de la transacción DB
+        $order->loadMissing('cliente');
+        $whatsappUrl = null;
+        $client = $order->cliente;
+        $phone = $order->telefono_contacto ?: ($client?->telefono);
+
+        if ($phone) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+            if (strlen($cleanPhone) === 9) {
+                $cleanPhone = '51'.$cleanPhone;
+            }
+
+            $business = Business::first();
+            $businessName = $business?->nombre ?? 'Pala-Sed';
+
+            $receiptMessage = "💧 *COMPROBANTE DE ENTREGA - {$businessName}*\n"
+                ."━━━━━━━━━━━━━━━━━━━━━\n"
+                ."📄 *Pedido:* {$order->codigo_orden}\n"
+                .'👤 *Cliente:* '.($client?->nombres ?? 'Cliente')."\n"
+                .'📅 *Fecha:* '.Carbon::parse($order->fecha_entrega)->format('d/m/Y H:i')."\n"
+                ."📍 *Dirección:* {$order->direccion_entrega}\n"
+                ."━━━━━━━━━━━━━━━━━━━━━\n"
+                ."📦 *Bidones Entregados:* {$order->bidones_a_entregar}\n"
+                ."🔄 *Envases Devueltos:* {$order->bidones_vacios_recibidos}\n";
+
+            if ($order->bidones_danados_recibidos > 0) {
+                $receiptMessage .= "⚠️ *Envases Dañados:* {$order->bidones_danados_recibidos} (S/ ".number_format($order->cobro_envases_danados, 2).")\n";
+            }
+
+            $receiptMessage .= '💳 *Método de Pago:* '.ucfirst($order->metodo_pago ?? 'Efectivo')."\n"
+                .'💰 *TOTAL PAGADO:* S/ '.number_format($order->total, 2)."\n"
+                ."━━━━━━━━━━━━━━━━━━━━━\n"
+                .'¡Muchas gracias por su preferencia!';
+
+            $whatsappUrl = 'https://wa.me/'.$cleanPhone.'?text='.urlencode($receiptMessage);
+        }
+
+        return response()->json([
+            'status' => true,
+            'msg' => "¡Entrega de orden {$order->codigo_orden} completada con éxito!",
+            'type' => 'success',
+            'whatsapp_url' => $whatsappUrl,
+            'has_whatsapp' => ! empty($whatsappUrl),
+        ]);
     }
 
     public function cancel(Request $request)
@@ -429,7 +487,7 @@ class DeliveryController extends Controller
         $order = DeliveryOrder::findOrFail($request->input('id'));
         $order->update([
             'estado' => 'cancelado',
-            'notas' => ($order->notas ? $order->notas . ' | ' : '') . 'Cancelado: ' . $request->input('motivo', 'Sin motivo'),
+            'notas' => ($order->notas ? $order->notas.' | ' : '').'Cancelado: '.$request->input('motivo', 'Sin motivo'),
         ]);
 
         return response()->json([
@@ -491,18 +549,18 @@ class DeliveryController extends Controller
             $subtotal += round($precioBase * $cantidad, 2);
 
             $cartProducts[] = [
-                'id'             => $product->id,
-                'descripcion'    => $product->descripcion,
-                'idunidad'       => $product->idunidad,
-                'unidad'         => optional($product->unidad)->codigo ?? 'NIU',
-                'igv'            => $igvVal,
-                'idcodigo_igv'   => $product->idcodigo_igv ?? 1,
-                'precio_compra'  => $product->precio_compra,
-                'precio_venta'   => $precioVenta,
-                'stock'          => $stockRow ? (int) $stockRow->stock_actual : null,
-                'opcion'         => (int) $product->opcion,
-                'cantidad'       => $cantidad,
-                'idalmacen'      => $idalmacen,
+                'id' => $product->id,
+                'descripcion' => $product->descripcion,
+                'idunidad' => $product->idunidad,
+                'unidad' => optional($product->unidad)->codigo ?? 'NIU',
+                'igv' => $igvVal,
+                'idcodigo_igv' => $product->idcodigo_igv ?? 1,
+                'precio_compra' => $product->precio_compra,
+                'precio_venta' => $precioVenta,
+                'stock' => $stockRow ? (int) $stockRow->stock_actual : null,
+                'opcion' => (int) $product->opcion,
+                'cantidad' => $cantidad,
+                'idalmacen' => $idalmacen,
             ];
         }
 
@@ -510,9 +568,9 @@ class DeliveryController extends Controller
 
         session(['pos' => [
             'products' => $cartProducts,
-            'igv'      => $igv,
+            'igv' => $igv,
             'subtotal' => $subtotal,
-            'total'    => $total,
+            'total' => $total,
         ]]);
 
         // Guardar ID del pedido de entrega en sesión para vincular con el comprobante al guardar venta
@@ -524,8 +582,8 @@ class DeliveryController extends Controller
 
         return redirect()->route('admin.pos.create', [
             'from_delivery' => $order->id,
-            'tipo'          => $tipo,
-            'client_id'     => $clientId,
+            'tipo' => $tipo,
+            'client_id' => $clientId,
         ]);
     }
 

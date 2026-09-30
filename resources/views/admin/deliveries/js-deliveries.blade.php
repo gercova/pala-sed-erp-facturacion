@@ -293,6 +293,23 @@
                     $('#modal-complete-delivery').modal('hide');
                     toast_msg(r.msg, 'success');
                     tableDeliveries.ajax.reload();
+
+                    if (r.whatsapp_url) {
+                        Swal.fire({
+                            title: '¡Entrega Completada!',
+                            text: '¿Deseas enviar el comprobante de entrega por WhatsApp al cliente?',
+                            icon: 'success',
+                            showCancelButton: true,
+                            confirmButtonColor: '#25D366',
+                            cancelButtonColor: '#6e7881',
+                            confirmButtonText: '<i class="ri-whatsapp-line me-1"></i> Enviar WhatsApp',
+                            cancelButtonText: 'Cerrar'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.open(r.whatsapp_url, '_blank');
+                            }
+                        });
+                    }
                 },
                 error: function(xhr) {
                     toast_msg(xhr.responseJSON?.msg || 'Error al completar entrega', 'error');

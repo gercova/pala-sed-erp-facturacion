@@ -172,6 +172,17 @@
                     <input type="text" id="input_dni" name="nro_documento" class="form-control" placeholder="Para boleta o factura">
                 </div>
 
+                <!-- Enviar a otra dirección (para clientes reconocidos) -->
+                <div id="wrapper-otra-direccion" class="d-none mb-3 p-2 bg-light rounded-3 border">
+                    <div class="form-check form-switch mb-1">
+                        <input class="form-check-input" type="checkbox" id="check_otra_direccion" name="enviar_otra_direccion" value="1">
+                        <label class="form-check-label small fw-bold text-dark" for="check_otra_direccion">
+                            <i class="ri-map-pin-range-line text-primary"></i> Enviar a otra dirección para este pedido
+                        </label>
+                    </div>
+                    <small class="text-muted d-block" style="font-size: 11px;">Marca esta opción si deseas recibir este pedido en una ubicación diferente sin alterar tu dirección principal registrada.</small>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label small fw-bold">Dirección de Entrega <span class="text-danger">*</span></label>
                     <input type="text" id="input_address" name="direccion" class="form-control" placeholder="Av. / Jr. / Calle y Nro. Interior/Dpto." required>
@@ -417,8 +428,10 @@
                             if (c.nro_documento && !c.nro_documento.startsWith('GEN-')) {
                                 $('#input_dni').val(c.nro_documento);
                             }
-                            $('#input_address').val(c.direccion);
-                            $('#input_reference').val(c.referencia || '');
+                            $('#input_address').val(c.direccion).data('original-address', c.direccion);
+                            $('#input_reference').val(c.referencia || '').data('original-reference', c.referencia || '');
+                            $('#wrapper-otra-direccion').removeClass('d-none');
+                            $('#check_otra_direccion').prop('checked', false);
 
                             // Fidelidad
                             if (r.loyalty && r.loyalty.has_promotion) {
@@ -433,11 +446,26 @@
                             }
                         } else {
                             $('#client-loyalty-box').addClass('d-none');
+                            $('#wrapper-otra-direccion').addClass('d-none');
+                            $('#check_otra_direccion').prop('checked', false);
                             clientEligibleForFree = false;
                             calculateTotals();
                         }
                     }
                 });
+            });
+
+            // Toggle para enviar a otra dirección
+            $('#check_otra_direccion').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#input_address').val('').attr('placeholder', 'Ingresa la nueva dirección de entrega para este pedido').focus();
+                    $('#input_reference').val('').attr('placeholder', 'Referencia de la nueva dirección');
+                } else {
+                    let origAddr = $('#input_address').data('original-address') || '';
+                    let origRef = $('#input_reference').data('original-reference') || '';
+                    $('#input_address').val(origAddr).attr('placeholder', 'Av. / Jr. / Calle y Nro. Interior/Dpto.');
+                    $('#input_reference').val(origRef).attr('placeholder', 'Frente a la tienda / Timbre blanco');
+                }
             });
 
             // Enviar pedido

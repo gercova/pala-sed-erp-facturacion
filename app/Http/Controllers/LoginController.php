@@ -33,9 +33,9 @@ class LoginController extends Controller
 
     public function index(): View
     {
-        $business  = Business::first();
-        $logo      = $business?->logo;
-        $docTypes  = IdentityDocumentType::where('estado', 1)->get();
+        $business = Business::first();
+        $logo = $business?->logo;
+        $docTypes = IdentityDocumentType::where('estado', 1)->get();
 
         return view('login', compact('logo', 'docTypes'));
     }
@@ -44,16 +44,20 @@ class LoginController extends Controller
 
     public function login(Request $request): RedirectResponse
     {
-        $request->validate([
-            'user'     => ['required', 'string', 'max:100'],
-            'password' => ['required', 'string', 'max:255'],
-        ], [
-            'user.required'     => 'El campo usuario es obligatorio.',
+        $clientLoginMode = config('erp.client_login_mode', 'password');
+
+        $rules = [
+            'user' => ['required', 'string', 'max:100'],
+            'password' => $clientLoginMode === 'id_only' ? ['nullable', 'string', 'max:255'] : ['required', 'string', 'max:255'],
+        ];
+
+        $request->validate($rules, [
+            'user.required' => 'El campo usuario es obligatorio.',
             'password.required' => 'El campo contraseña es obligatorio.',
         ]);
 
-        $username    = strtolower(trim((string) $request->input('user')));
-        $password    = trim((string) $request->input('password'));
+        $username = strtolower(trim((string) $request->input('user')));
+        $password = trim((string) $request->input('password'));
         $throttleKey = $this->throttleKey($request);
 
         if (RateLimiter::tooManyAttempts($throttleKey, self::MAX_ATTEMPTS)) {
@@ -61,6 +65,31 @@ class LoginController extends Controller
             Log::warning('Login bloqueado por demasiados intentos.', ['username' => $username, 'ip' => $request->ip()]);
 
             return back()->with('message', "Demasiados intentos fallidos. Intente de nuevo en {$seconds} segundos.");
+        }
+
+        // Feature flag: Modo de acceso solo documento/ID para clientes registrados
+        if ($clientLoginMode === 'id_only' && $password === '') {
+            $client = Client::where('nro_documento', $username)->first();
+            $clientUser = $client
+                ? User::where('idcliente', $client->id)->first()
+                : User::where('user', $username)->first();
+
+            if ($clientUser && $clientUser->hasRole('Cliente')) {
+                if ((int) ($clientUser->estado ?? 0) !== 1) {
+                    return back()->with('message', 'No tiene permisos para acceder al sistema. Contacte al administrador.');
+                }
+
+                Auth::login($clientUser);
+                $request->session()->regenerate();
+                RateLimiter::clear($throttleKey);
+                Log::info('Login de cliente por documento (modo id_only).', ['user_id' => $clientUser->id, 'ip' => $request->ip()]);
+
+                return redirect()->route('cliente.dashboard')->with('message_welcome', 'Bienvenido a tu portal.');
+            }
+
+            RateLimiter::hit($throttleKey, 60);
+
+            return back()->with('message', 'Credenciales incorrectas o el usuario requiere contraseña.');
         }
 
         if (! Auth::attempt(['user' => $username, 'password' => $password], false)) {
@@ -119,18 +148,18 @@ class LoginController extends Controller
     public function register(Request $request): RedirectResponse
     {
         $request->validate([
-            'reg_iddoc'        => ['required', 'integer', 'exists:identity_document_types,id'],
-            'reg_nro_doc'      => ['required', 'string', 'max:20'],
-            'reg_nombres'      => ['required', 'string', 'max:255'],
-            'reg_telefono'     => ['required', 'string', 'max:15', 'regex:/^[0-9+\s\-]+$/'],
-            'reg_ubigeo'       => ['required', 'string', 'in:' . implode(',', self::ALLOWED_UBIGEOS)],
-            'reg_direccion'    => ['required', 'string', 'max:255'],
-            'reg_password'     => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
+            'reg_iddoc' => ['required', 'integer', 'exists:identity_document_types,id'],
+            'reg_nro_doc' => ['required', 'string', 'max:20'],
+            'reg_nombres' => ['required', 'string', 'max:255'],
+            'reg_telefono' => ['required', 'string', 'max:15', 'regex:/^[0-9+\s\-]+$/'],
+            'reg_ubigeo' => ['required', 'string', 'in:'.implode(',', self::ALLOWED_UBIGEOS)],
+            'reg_direccion' => ['required', 'string', 'max:255'],
+            'reg_password' => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
         ], [
-            'reg_ubigeo.in'        => 'Solo atendemos en: ' . implode(', ', self::ALLOWED_DISTRICTS) . '.',
+            'reg_ubigeo.in' => 'Solo atendemos en: '.implode(', ', self::ALLOWED_DISTRICTS).'.',
             'reg_nro_doc.required' => 'El número de documento es obligatorio.',
             'reg_password.confirmed' => 'Las contraseñas no coinciden.',
-            'reg_password.min'     => 'La contraseña debe tener al menos 8 caracteres.',
+            'reg_password.min' => 'La contraseña debe tener al menos 8 caracteres.',
         ]);
 
         // Verificar unicidad del documento
@@ -154,32 +183,32 @@ class LoginController extends Controller
         // Verificar que no exista el usuario
         $username = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $request->input('reg_nro_doc')));
         if (User::where('user', $username)->exists()) {
-            $username = $username . rand(10, 99);
+            $username = $username.rand(10, 99);
         }
 
         return DB::transaction(function () use ($request, $username) {
             // 1. Crear cliente
             $client = Client::create([
-                'iddoc'        => $request->input('reg_iddoc'),
+                'iddoc' => $request->input('reg_iddoc'),
                 'nro_documento' => trim($request->input('reg_nro_doc')),
-                'nombres'      => mb_strtoupper(trim($request->input('reg_nombres'))),
-                'telefono'     => trim($request->input('reg_telefono')),
-                'ubigeo'       => $request->input('reg_ubigeo'),
-                'direccion'    => mb_strtoupper(trim($request->input('reg_direccion'))),
-                'codigo_pais'  => 'PE',
+                'nombres' => mb_strtoupper(trim($request->input('reg_nombres'))),
+                'telefono' => trim($request->input('reg_telefono')),
+                'ubigeo' => $request->input('reg_ubigeo'),
+                'direccion' => mb_strtoupper(trim($request->input('reg_direccion'))),
+                'codigo_pais' => 'PE',
                 'saldo_envases' => 0,
             ]);
 
             // 2. Crear usuario vinculado
             $user = User::create([
-                'nombres'    => mb_strtoupper(trim($request->input('reg_nombres'))),
-                'user'       => $username,
-                'password'   => Hash::make($request->input('reg_password')),
-                'estado'     => 1,
-                'idcaja'     => null,
-                'idalmacen'  => null,
-                'idcliente'  => $client->id,
-                'tipo'       => 'cliente',
+                'nombres' => mb_strtoupper(trim($request->input('reg_nombres'))),
+                'user' => $username,
+                'password' => Hash::make($request->input('reg_password')),
+                'estado' => 1,
+                'idcaja' => null,
+                'idalmacen' => null,
+                'idcliente' => $client->id,
+                'tipo' => 'cliente',
             ]);
 
             // 3. Asignar rol
@@ -192,7 +221,7 @@ class LoginController extends Controller
             Log::info('Nuevo cliente registrado.', ['user_id' => $user->id, 'client_id' => $client->id]);
 
             return redirect()->route('cliente.dashboard')
-                ->with('message_welcome', '¡Registro exitoso! Bienvenido/a, ' . ucwords(strtolower($client->nombres)) . '.');
+                ->with('message_welcome', '¡Registro exitoso! Bienvenido/a, '.ucwords(strtolower($client->nombres)).'.');
         });
     }
 
@@ -203,6 +232,7 @@ class LoginController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
         return redirect()->route('login');
     }
 
@@ -212,7 +242,7 @@ class LoginController extends Controller
     {
         return Str::lower(
             strtolower(trim((string) $request->input('user', '')))
-            . '|' . $request->ip()
+            .'|'.$request->ip()
         );
     }
 }

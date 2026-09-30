@@ -6,8 +6,8 @@ use App\Models\ArchingCash;
 use App\Models\Billing;
 use App\Models\Business;
 use App\Models\Client;
-use App\Models\DetailBilling;
 use App\Models\DeliveryOrder;
+use App\Models\DetailBilling;
 use App\Models\DetailPayment;
 use App\Models\DetailSaleNote;
 use App\Models\IdentityDocumentType;
@@ -82,8 +82,8 @@ class PosController extends Controller
         // Datos de pre-carga opcionales para el JS del POS
         $data['preload'] = [
             'from_delivery' => $request->query('from_delivery'),
-            'tipo'          => $request->query('tipo', 'boleta'),   // boleta | factura_dni | factura_ruc
-            'client_id'     => $request->query('client_id'),
+            'tipo' => $request->query('tipo', 'boleta'),   // boleta | factura_dni | factura_ruc
+            'client_id' => $request->query('client_id'),
         ];
 
         return view('admin.pos.home', $data);
@@ -146,26 +146,26 @@ class PosController extends Controller
             }
 
             if ($typeSearch !== '') {
-                $documents->where('document_type', 'like', '%' . $typeSearch . '%');
+                $documents->where('document_type', 'like', '%'.$typeSearch.'%');
             }
 
             if ($documentSearch !== '') {
-                $documents->where('document_number', 'like', '%' . $documentSearch . '%');
+                $documents->where('document_number', 'like', '%'.$documentSearch.'%');
             }
 
             if ($customerSearch !== '') {
                 $documents->where(function ($query) use ($customerSearch) {
-                    $query->where('customer_name', 'like', '%' . $customerSearch . '%')
-                        ->orWhere('customer_document', 'like', '%' . $customerSearch . '%');
+                    $query->where('customer_name', 'like', '%'.$customerSearch.'%')
+                        ->orWhere('customer_document', 'like', '%'.$customerSearch.'%');
                 });
             }
 
             if ($totalSearch !== '') {
-                $documents->where('total', 'like', '%' . str_replace(',', '.', $totalSearch) . '%');
+                $documents->where('total', 'like', '%'.str_replace(',', '.', $totalSearch).'%');
             }
 
             if ($statusSearch !== '') {
-                $documents->where('status_label', 'like', '%' . $statusSearch . '%');
+                $documents->where('status_label', 'like', '%'.$statusSearch.'%');
             }
         }
 
@@ -181,18 +181,18 @@ class PosController extends Controller
                     default => 'bg-success-subtle text-success',
                 };
 
-                return '<span class="badge ' . $class . '">' . e((string) $document->document_type) . '</span>';
+                return '<span class="badge '.$class.'">'.e((string) $document->document_type).'</span>';
             })
             ->addColumn('document_info', function ($document) {
-                return '<div class="text-center"><div class="fw-semibold">' . e((string) $document->document_number) . '</div></div>';
+                return '<div class="text-center"><div class="fw-semibold">'.e((string) $document->document_number).'</div></div>';
             })
             ->addColumn('customer_info', function ($document) {
                 return '<div class="billing-customer-cell">'
-                    . '<div class="billing-customer-name">' . e((string) $document->customer_name) . '</div>'
-                    . '<small class="billing-customer-doc">' . e((string) ($document->customer_document ?: 'Sin documento')) . '</small>'
-                    . '</div>';
+                    .'<div class="billing-customer-name">'.e((string) $document->customer_name).'</div>'
+                    .'<small class="billing-customer-doc">'.e((string) ($document->customer_document ?: 'Sin documento')).'</small>'
+                    .'</div>';
             })
-            ->addColumn('total_badge', fn ($document) => '<div class="billing-total-chip">' . e($this->signo_pais() . ' ' . number_format((float) $document->total, 2, '.', '')) . '</div>')
+            ->addColumn('total_badge', fn ($document) => '<div class="billing-total-chip">'.e($this->signo_pais().' '.number_format((float) $document->total, 2, '.', '')).'</div>')
             ->addColumn('status_badge', function ($document) {
                 $class = match ((string) $document->status_label) {
                     'Anulado' => 'bg-danger-subtle text-danger',
@@ -201,7 +201,7 @@ class PosController extends Controller
                     default => 'bg-light text-dark border',
                 };
 
-                return '<span class="badge ' . $class . '">' . e((string) $document->status_label) . '</span>';
+                return '<span class="badge '.$class.'">'.e((string) $document->status_label).'</span>';
             })
             ->rawColumns(['document_type_badge', 'document_info', 'customer_info', 'total_badge', 'status_badge'])
             ->toJson();
@@ -229,40 +229,40 @@ class PosController extends Controller
                 $subtotal = number_format(((float) $product['precio_venta'] * (float) $product['cantidad']), 2, '.', '');
                 $precioVenta = number_format((float) $product['precio_venta'], 2, '.', '');
 
-                $html_cart .= '<tr id="row-' . $contador . '">
-                    <td class="align-middle">' . e((string) $product['descripcion']) . '</td>
+                $html_cart .= '<tr id="row-'.$contador.'">
+                    <td class="align-middle">'.e((string) $product['descripcion']).'</td>
                     <td class="text-center align-middle">
                         <input type="text" class="form-control form-control-sm text-center input-update"
-                            value="' . $precioVenta . '"
-                            data-cantidad="' . e((string) $product['cantidad']) . '"
-                            data-id="' . e((string) $product['id']) . '"
+                            value="'.$precioVenta.'"
+                            data-cantidad="'.e((string) $product['cantidad']).'"
+                            data-id="'.e((string) $product['id']).'"
                             name="precio_venta">
                     </td>
                     <td class="text-center align-middle">
                         <div class="input-group input-group-sm">
                             <button class="btn btn-light border btn-down" type="button"
-                                data-id="' . e((string) $product['id']) . '"
-                                data-cantidad="' . e((string) $product['cantidad']) . '"
-                                data-precio_venta="' . e((string) $product['precio_venta']) . '">
+                                data-id="'.e((string) $product['id']).'"
+                                data-cantidad="'.e((string) $product['cantidad']).'"
+                                data-precio_venta="'.e((string) $product['precio_venta']).'">
                                 <i class="ri-subtract-line"></i>
                             </button>
                             <input type="text" class="form-control text-center input-quantity"
-                                value="' . e((string) $product['cantidad']) . '"
-                                data-id="' . e((string) $product['id']) . '"
-                                data-precio_venta="' . e((string) $product['precio_venta']) . '"
+                                value="'.e((string) $product['cantidad']).'"
+                                data-id="'.e((string) $product['id']).'"
+                                data-precio_venta="'.e((string) $product['precio_venta']).'"
                                 min="0" style="max-width: 60px;">
                             <button class="btn btn-light border btn-up" type="button"
-                                data-id="' . e((string) $product['id']) . '"
-                                data-cantidad="' . e((string) $product['cantidad']) . '"
-                                data-precio_venta="' . e((string) $product['precio_venta']) . '">
+                                data-id="'.e((string) $product['id']).'"
+                                data-cantidad="'.e((string) $product['cantidad']).'"
+                                data-precio_venta="'.e((string) $product['precio_venta']).'">
                                 <i class="ri-add-line"></i>
                             </button>
                         </div>
                     </td>
-                    <td class="text-center align-middle fw-bold">' . $subtotal . '</td>
+                    <td class="text-center align-middle fw-bold">'.$subtotal.'</td>
                     <td class="text-center align-middle">
                         <button class="btn btn-sm btn-danger btn-delete-product"
-                            data-id="' . e((string) $product['id']) . '"
+                            data-id="'.e((string) $product['id']).'"
                             title="Eliminar">
                             <i class="ri-delete-bin-line"></i>
                         </button>
@@ -280,10 +280,10 @@ class PosController extends Controller
             </tr>';
         }
 
-        $html_totales .= '<p>Subtotal: <span id="subtotal" class="float-end">' . $signo . number_format((float) $cart['subtotal'], 2, '.', '') . '</span></p>
-                        <p>IGV: <span id="igv" class="float-end">' . $signo . number_format((float) $cart['igv'], 2, '.', '') . '</span></p>
+        $html_totales .= '<p>Subtotal: <span id="subtotal" class="float-end">'.$signo.number_format((float) $cart['subtotal'], 2, '.', '').'</span></p>
+                        <p>IGV: <span id="igv" class="float-end">'.$signo.number_format((float) $cart['igv'], 2, '.', '').'</span></p>
                         <hr>
-                        <h5>Total: <span id="total" class="float-end">' . $signo . number_format((float) $cart['total'], 2, '.', '') . '</span></h5>';
+                        <h5>Total: <span id="total" class="float-end">'.$signo.number_format((float) $cart['total'], 2, '.', '').'</span></h5>';
 
         return response()->json([
             'status' => true,
@@ -321,17 +321,17 @@ class PosController extends Controller
             ->join('warehouses', 'stock_products.idalmacen', '=', 'warehouses.id')
             ->where('warehouses.id', $idalmacen)
             ->where(function ($query) use ($value) {
-                $query->where('products.descripcion', 'like', '%' . $value . '%')
-                    ->orWhere('categories.descripcion', 'like', '%' . $value . '%')
-                    ->orWhere('products.codigo_barras', 'like', '%' . $value . '%')
-                    ->orWhere('products.codigo_interno', 'like', '%' . $value . '%');
+                $query->where('products.descripcion', 'like', '%'.$value.'%')
+                    ->orWhere('categories.descripcion', 'like', '%'.$value.'%')
+                    ->orWhere('products.codigo_barras', 'like', '%'.$value.'%')
+                    ->orWhere('products.codigo_interno', 'like', '%'.$value.'%');
             })
             ->limit(6)
             ->get();
 
         $datos = $productos->map(function ($producto) {
             $signo = $this->signo_pais();
-            $precio = $signo . number_format((float) $producto->precio_venta, 2);
+            $precio = $signo.number_format((float) $producto->precio_venta, 2);
 
             return [
                 'label' => $producto->descripcion,
@@ -653,7 +653,7 @@ class PosController extends Controller
             if ((float) $product['precio_venta'] <= 0) {
                 return response()->json([
                     'status' => false,
-                    'msg' => 'Ingrese un precio válido para ' . $product['descripcion'],
+                    'msg' => 'Ingrese un precio válido para '.$product['descripcion'],
                     'type' => 'warning',
                 ], 422);
             }
@@ -728,7 +728,7 @@ class PosController extends Controller
         $paymentBreakdown = $this->buildPaymentBreakdown($data['payments']);
         $firstPayMethodId = (int) ($paymentBreakdown[0]['id'] ?? $data['payments'][0]['method_id']);
         $change = max(0, round($totalPaid - $cartTotal, 2));
-        $baseName = $documentType->codigo . '-' . $serieModel->serie . '-' . $serieModel->correlativo;
+        $baseName = $documentType->codigo.'-'.$serieModel->serie.'-'.$serieModel->correlativo;
 
         try {
             $result = DB::transaction(function () use (
@@ -881,10 +881,6 @@ class PosController extends Controller
 
                 $this->advanceSerieCorrelative($serieModel);
 
-                if ($documentKind === 'billing') {
-                    $this->attemptSunatDispatch($document);
-                }
-
                 if ($documentKind === 'sale_note') {
                     $ticketUrl = $this->generateSaleNoteTicket($documentId, $baseName);
                 } else {
@@ -908,12 +904,19 @@ class PosController extends Controller
 
         $this->destroy_cart();
 
+        if ($result['document_kind'] === 'billing') {
+            $billingDoc = Billing::find($result['document_id']);
+            if ($billingDoc) {
+                $this->attemptSunatDispatch($billingDoc);
+            }
+        }
+
         return response()->json([
             'status' => true,
             'id' => $result['document_id'],
             'document_kind' => $result['document_kind'],
             'ticket_url' => $result['ticket_url'],
-            'pdf' => $result['base_name'] . '.pdf',
+            'pdf' => $result['base_name'].'.pdf',
             'type_document' => (int) $documentType->id,
         ]);
     }
@@ -966,7 +969,7 @@ class PosController extends Controller
             if ((float) $product['precio_venta'] <= 0) {
                 return response()->json([
                     'status' => false,
-                    'msg' => 'Ingrese un precio valido para ' . $product['descripcion'] . '.',
+                    'msg' => 'Ingrese un precio valido para '.$product['descripcion'].'.',
                     'type' => 'warning',
                 ], 422);
             }
@@ -1058,7 +1061,7 @@ class PosController extends Controller
             $paymentBreakdown = collect($installments)->map(function ($installment, $index) {
                 return [
                     'id' => 0,
-                    'descripcion' => 'Cuota ' . ($index + 1),
+                    'descripcion' => 'Cuota '.($index + 1),
                     'monto' => number_format((float) $installment['monto'], 2, '.', ''),
                 ];
             })->values()->all();
@@ -1100,7 +1103,7 @@ class PosController extends Controller
             ], 422);
         }
 
-        $baseName = $documentType->codigo . '-' . $serieModel->serie . '-' . $serieModel->correlativo;
+        $baseName = $documentType->codigo.'-'.$serieModel->serie.'-'.$serieModel->correlativo;
 
         try {
             $result = DB::transaction(function () use (
@@ -1258,13 +1261,8 @@ class PosController extends Controller
 
                 $this->advanceSerieCorrelative($serieModel);
 
-                if ($documentKind === 'billing') {
-                    $this->attemptSunatDispatch($document);
-                    $document->refresh();
-                }
-
                 $successMessage = $documentKind === 'sale_note'
-                    ? 'La nota de venta ' . $baseName . ' ha sido registrada correctamente.'
+                    ? 'La nota de venta '.$baseName.' ha sido registrada correctamente.'
                     : $this->resolveBillingSuccessMessage($document);
 
                 return [
@@ -1287,6 +1285,15 @@ class PosController extends Controller
 
         $this->destroy_cart();
 
+        if ($result['document_kind'] === 'billing') {
+            $billingDoc = Billing::find($result['document_id']);
+            if ($billingDoc) {
+                $this->attemptSunatDispatch($billingDoc);
+                $billingDoc->refresh();
+                $result['msg'] = $this->resolveBillingSuccessMessage($billingDoc);
+            }
+        }
+
         // Si la venta proviene de un pedido de delivery, vincular el comprobante emitido
         $deliveryOrderId = session('from_delivery_order_id') ?? $request->input('from_delivery');
         if ($deliveryOrderId) {
@@ -1308,7 +1315,7 @@ class PosController extends Controller
             'id' => $result['document_id'],
             'document_kind' => $result['document_kind'],
             'ticket_url' => $result['ticket_url'],
-            'pdf' => $result['base_name'] . '.pdf',
+            'pdf' => $result['base_name'].'.pdf',
             'msg' => $result['msg'] ?? 'Venta registrada correctamente.',
             'type_document' => (int) $documentType->id,
         ]);
@@ -1410,17 +1417,17 @@ class PosController extends Controller
             default => 'El comprobante',
         };
 
-        $document = trim($billing->serie . '-' . $billing->correlativo);
+        $document = trim($billing->serie.'-'.$billing->correlativo);
 
         if ((int) ($billing->cdr ?? 0) === 1 && (int) ($billing->estado_cpe ?? -1) === 0) {
-            return $label . ' ' . $document . ' ha sido aceptada.';
+            return $label.' '.$document.' ha sido aceptada.';
         }
 
         if ((int) ($billing->cdr ?? 0) === 1) {
-            return $label . ' ' . $document . ' ha sido enviada y procesada.';
+            return $label.' '.$document.' ha sido enviada y procesada.';
         }
 
-        return $label . ' ' . $document . ' ha sido registrada correctamente.';
+        return $label.' '.$document.' ha sido registrada correctamente.';
     }
 
     protected function getPosDocumentTypes()
@@ -1467,7 +1474,7 @@ class PosController extends Controller
             }
 
             if ((int) $registro->stock_actual < (int) $product['cantidad']) {
-                throw new \RuntimeException('Stock insuficiente para ' . $product['descripcion'] . '.');
+                throw new \RuntimeException('Stock insuficiente para '.$product['descripcion'].'.');
             }
         }
     }
@@ -1505,17 +1512,17 @@ class PosController extends Controller
             ->get();
 
         $warehouse = Warehouse::find((int) Auth::user()->idalmacen);
-        $formatter = new NumeroALetras();
+        $formatter = new NumeroALetras;
         $data = [
             'name' => $name,
             'business' => $this->resolveBusinessForWarehouse($business, $warehouse),
             'document_label' => $typeDocument?->descripcion ?? 'NOTA DE VENTA',
-            'document_number' => $saleNote->serie . ' - ' . $saleNote->correlativo,
+            'document_number' => $saleNote->serie.' - '.$saleNote->correlativo,
             'customer_name' => $saleNote->cliente?->nombres ?? 'Cliente',
             'customer_document_label' => $saleNote->cliente?->tipoDocumento?->descripcion ?? 'Documento',
             'customer_document_value' => $saleNote->cliente?->nro_documento ?? '-',
             'customer_address' => $saleNote->cliente?->direccion ?? '-',
-            'issued_at' => date('d/m/Y', strtotime((string) $saleNote->fecha_emision)) . ' ' . $saleNote->hora,
+            'issued_at' => date('d/m/Y', strtotime((string) $saleNote->fecha_emision)).' '.$saleNote->hora,
             'seller' => mb_strtoupper((string) ($saleNote->usuario->user ?? '')),
             'items' => $details,
             'subtotal' => $saleNote->subtotal,
@@ -1548,18 +1555,18 @@ class PosController extends Controller
             ->where('idfacturacion', $billing->id)
             ->get();
 
-        $formatter = new NumeroALetras();
+        $formatter = new NumeroALetras;
         $qrImage = $this->ensureBillingQrImage($billing);
         $data = [
             'name' => $name,
             'business' => $this->resolveBusinessForWarehouse($business, $billing->warehouse),
             'document_label' => $billing->typeDocument?->descripcion ?? 'COMPROBANTE',
-            'document_number' => $billing->serie . ' - ' . $billing->correlativo,
+            'document_number' => $billing->serie.' - '.$billing->correlativo,
             'customer_name' => $billing->customer?->nombres ?? 'Cliente',
             'customer_document_label' => $billing->customer?->tipoDocumento?->descripcion ?? 'Documento',
             'customer_document_value' => $billing->customer?->nro_documento ?? '-',
             'customer_address' => $billing->customer?->direccion ?? '-',
-            'issued_at' => date('d/m/Y', strtotime((string) $billing->fecha_emision)) . ' ' . $billing->hora,
+            'issued_at' => date('d/m/Y', strtotime((string) $billing->fecha_emision)).' '.$billing->hora,
             'seller' => mb_strtoupper((string) ($billing->user->user ?? '')),
             'items' => $details,
             'subtotal' => $billing->gravada,
@@ -1583,13 +1590,13 @@ class PosController extends Controller
     protected function savePosTicket(string $folder, string $name, array $data): string
     {
         $customPaper = [0, 0, 226.77, 900.00];
-        $path = public_path('files/' . $folder);
+        $path = public_path('files/'.$folder);
         File::ensureDirectoryExists($path);
 
         $pdf = Pdf::loadView('admin.pos.ticket_document', $data)->setPaper($customPaper, 'portrait');
-        $pdf->save($path . DIRECTORY_SEPARATOR . $name . '.pdf');
+        $pdf->save($path.DIRECTORY_SEPARATOR.$name.'.pdf');
 
-        return asset('files/' . $folder . '/' . $name . '.pdf');
+        return asset('files/'.$folder.'/'.$name.'.pdf');
     }
 
     protected function ensureBillingQrImage(Billing $billing): ?string
@@ -1605,8 +1612,8 @@ class PosController extends Controller
             return null;
         }
 
-        $filename = trim((string) ($billing->serie . '-' . $billing->correlativo)) . '.png';
-        $relativePath = 'files/billings/qr/' . $filename;
+        $filename = trim((string) ($billing->serie.'-'.$billing->correlativo)).'.png';
+        $relativePath = 'files/billings/qr/'.$filename;
         $absolutePath = public_path($relativePath);
 
         if (! is_file($absolutePath)) {
@@ -1692,7 +1699,7 @@ class PosController extends Controller
             $igvProducto = ((float) $product['precio_venta'] - $precioBase) * (int) $product['cantidad'];
             $igv += $this->redondeado($igvProducto);
             $subtotal += $precioBase * (int) $product['cantidad'];
-            session()->put('pos.products.' . $index, $product);
+            session()->put('pos.products.'.$index, $product);
         }
 
         $total = $subtotal + $igv;
@@ -1776,7 +1783,7 @@ class PosController extends Controller
                 }
 
                 $sessionProduct['cantidad'] = $sessionProduct['cantidad'] + $cantidad;
-                session()->put('pos.products.' . $index, $sessionProduct);
+                session()->put('pos.products.'.$index, $sessionProduct);
 
                 return [
                     'status' => true,
@@ -1801,7 +1808,8 @@ class PosController extends Controller
 
         foreach (session()->get('pos')['products'] as $index => $product) {
             if ($id == $product['id'] && $opcion == $product['opcion']) {
-                session()->forget('pos.products.' . $index);
+                session()->forget('pos.products.'.$index);
+
                 return true;
             }
         }
@@ -1823,7 +1831,7 @@ class PosController extends Controller
 
                 $product['cantidad'] = $cantidad;
                 $product['precio_venta'] = $precio;
-                session()->put('pos.products.' . $index, $product);
+                session()->put('pos.products.'.$index, $product);
 
                 return true;
             }
@@ -1839,6 +1847,7 @@ class PosController extends Controller
         }
 
         session()->forget('pos');
+
         return true;
     }
 }

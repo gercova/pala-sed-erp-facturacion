@@ -77,6 +77,11 @@
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
+                        @if(config('erp.client_login_mode') === 'id_only')
+                            <small class="text-muted d-block mt-1" style="font-size:11px;">
+                                <i class="fas fa-info-circle text-info"></i> Acceso rápido para clientes disponible: Puedes ingresar solo con tu DNI.
+                            </small>
+                        @endif
                     </div>
 
                     <button type="submit" class="btn-auth" id="btn-login" style="margin-top:1rem;">

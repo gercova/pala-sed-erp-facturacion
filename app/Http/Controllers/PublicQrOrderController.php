@@ -9,7 +9,6 @@ use App\Models\DeliveryOrderItem;
 use App\Models\IdentityDocumentType;
 use App\Models\Product;
 use App\Services\Water\LoyaltyService;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -59,7 +58,7 @@ class PublicQrOrderController extends Controller
             ->orWhere('nro_documento', $term)
             ->first();
 
-        if (!$client) {
+        if (! $client) {
             return response()->json([
                 'status' => false,
                 'found' => false,
@@ -100,6 +99,7 @@ class PublicQrOrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.idproducto' => 'required|exists:products,id',
             'items.*.cantidad' => 'required|numeric|min:1',
+            'enviar_otra_direccion' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -116,19 +116,19 @@ class PublicQrOrderController extends Controller
 
             // Buscar cliente existente por teléfono o documento, o crear nuevo
             $client = null;
-            if (!empty($phone)) {
+            if (! empty($phone)) {
                 $client = Client::where('telefono', $phone)->first();
             }
-            if (!$client && !empty($dni)) {
+            if (! $client && ! empty($dni)) {
                 $client = Client::where('nro_documento', $dni)->first();
             }
 
             $docType = IdentityDocumentType::where('codigo', '1')->first() ?? IdentityDocumentType::first();
 
-            if (!$client) {
+            if (! $client) {
                 $client = Client::create([
                     'iddoc' => $docType?->id ?? 1,
-                    'nro_documento' => !empty($dni) ? $dni : ('GEN-' . time()),
+                    'nro_documento' => ! empty($dni) ? $dni : ('GEN-'.time()),
                     'nombres' => mb_strtoupper(trim((string) $request->input('nombres'))),
                     'direccion' => mb_strtoupper(trim((string) $request->input('direccion'))),
                     'referencia' => trim((string) $request->input('referencia')),
@@ -137,12 +137,20 @@ class PublicQrOrderController extends Controller
                     'saldo_envases' => 0,
                 ]);
             } else {
-                // Actualizar dirección y referencia si se proporcionaron
-                $client->update([
-                    'nombres' => mb_strtoupper(trim((string) $request->input('nombres'))),
-                    'direccion' => mb_strtoupper(trim((string) $request->input('direccion'))),
-                    'referencia' => trim((string) $request->input('referencia')),
-                ]);
+                $isAlternateAddress = (bool) $request->input('enviar_otra_direccion', false);
+
+                // Si no es dirección alternativa, actualizar dirección principal del cliente
+                if (! $isAlternateAddress) {
+                    $client->update([
+                        'nombres' => mb_strtoupper(trim((string) $request->input('nombres'))),
+                        'direccion' => mb_strtoupper(trim((string) $request->input('direccion'))),
+                        'referencia' => trim((string) $request->input('referencia')),
+                    ]);
+                } else {
+                    $client->update([
+                        'nombres' => mb_strtoupper(trim((string) $request->input('nombres'))),
+                    ]);
+                }
             }
 
             // Revisar si cliente califica a promoción de fidelidad
@@ -151,7 +159,7 @@ class PublicQrOrderController extends Controller
             $freeClaimedThisOrder = false;
 
             $lastId = DeliveryOrder::max('id') ?? 0;
-            $orderCode = 'PED-' . str_pad($lastId + 1, 6, '0', STR_PAD_LEFT);
+            $orderCode = 'PED-'.str_pad($lastId + 1, 6, '0', STR_PAD_LEFT);
 
             $subtotal = 0;
             $discountTotal = 0;
@@ -171,7 +179,7 @@ class PublicQrOrderController extends Controller
                     $totalDeliveredJugs += (int) $qty;
 
                     // Si califica a premio y no ha canjeado aún en este pedido, bonificar 1 unidad
-                    if ($canClaimFree && !$freeClaimedThisOrder) {
+                    if ($canClaimFree && ! $freeClaimedThisOrder) {
                         $itemDiscount = $price; // 100% descuento en 1 unidad
                         $freeClaimedThisOrder = true;
                     }
@@ -185,7 +193,7 @@ class PublicQrOrderController extends Controller
 
                 $itemsData[] = [
                     'idproducto' => $product->id,
-                    'descripcion' => $product->descripcion . ($itemDiscount > 0 ? ' [¡Premio Fidelidad 100% GRATIS!]' : ''),
+                    'descripcion' => $product->descripcion.($itemDiscount > 0 ? ' [¡Premio Fidelidad 100% GRATIS!]' : ''),
                     'tipo_item' => $itemDiscount > 0 ? 'bonificacion_fidelidad' : $tipoItem,
                     'cantidad' => $qty,
                     'precio_unitario' => $price,
@@ -213,7 +221,7 @@ class PublicQrOrderController extends Controller
                 'estado_pago' => 'pendiente',
                 'bidones_a_entregar' => $totalDeliveredJugs,
                 'bidones_vacios_recibidos' => (int) $request->input('envases_a_devolver', 0),
-                'notas' => 'Pedido QR. ' . ($request->filled('notas') ? 'Nota: ' . $request->input('notas') : ''),
+                'notas' => 'Pedido QR. '.($request->filled('notas') ? 'Nota: '.$request->input('notas') : ''),
             ]);
 
             foreach ($itemsData as $iData) {
@@ -229,12 +237,12 @@ class PublicQrOrderController extends Controller
             // Preparar enlace de WhatsApp para el cliente
             $business = Business::find(1);
             $companyPhone = preg_replace('/[^0-9]/', '', $business->telefono ?? '');
-            if (!empty($companyPhone) && strlen($companyPhone) === 9) {
-                $companyPhone = '51' . $companyPhone;
+            if (! empty($companyPhone) && strlen($companyPhone) === 9) {
+                $companyPhone = '51'.$companyPhone;
             }
 
-            $waMsg = urlencode("¡Hola! Acabo de registrar mi pedido de agua *{$orderCode}* desde el código QR.\nNombre: {$client->nombres}\nDirección: {$order->direccion_entrega}\nTotal: S/ " . number_format($finalTotal, 2));
-            $waLink = !empty($companyPhone) ? "https://wa.me/{$companyPhone}?text={$waMsg}" : null;
+            $waMsg = urlencode("¡Hola! Acabo de registrar mi pedido de agua *{$orderCode}* desde el código QR.\nNombre: {$client->nombres}\nDirección: {$order->direccion_entrega}\nTotal: S/ ".number_format($finalTotal, 2));
+            $waLink = ! empty($companyPhone) ? "https://wa.me/{$companyPhone}?text={$waMsg}" : null;
 
             return response()->json([
                 'status' => true,

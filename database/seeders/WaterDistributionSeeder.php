@@ -11,8 +11,6 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class WaterDistributionSeeder extends Seeder
 {
@@ -131,17 +129,17 @@ class WaterDistributionSeeder extends Seeder
             );
         }
 
-        // Promoción de Fidelización por Defecto (Compra 4, 5to Gratis)
+        // Promoción de Fidelización por Defecto (Compra 5, 6to Gratis: Programa 5+1)
         if ($recargaProduct) {
             LoyaltyPromotion::updateOrCreate(
-                ['nombre' => 'Fidelidad 4+1: Por cada 4 recargas, ¡la 5ta es GRATIS!'],
+                ['nombre' => 'Fidelidad 5+1: Por cada 5 recargas, ¡la 6ta es GRATIS!'],
                 [
-                    'meta_compras' => 4,
+                    'meta_compras' => 5,
                     'bonificacion' => 1,
                     'idproducto_objetivo' => $recargaProduct->id,
                     'idproducto_bonificado' => $recargaProduct->id,
                     'activo' => true,
-                    'descripcion' => 'Promoción especial para clientes recurrentes. Acumula 4 recargas de bidón y la quinta unidad no tiene costo.',
+                    'descripcion' => 'Promoción especial para clientes recurrentes. Acumula 5 recargas de bidón y la sexta unidad no tiene costo.',
                 ]
             );
         }
