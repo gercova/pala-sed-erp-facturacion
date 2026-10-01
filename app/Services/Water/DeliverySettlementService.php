@@ -2,13 +2,21 @@
 
 namespace App\Services\Water;
 
+use App\Jobs\EmitirComprobanteJob;
+use App\Jobs\EnviarWhatsAppJob;
 use App\Models\ArchingCash;
+use App\Models\Billing;
 use App\Models\Business;
 use App\Models\Client;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderStatusLog;
+use App\Models\DetailBilling;
 use App\Models\DetailPayment;
+use App\Models\DetailSaleNote;
 use App\Models\PayMode;
+use App\Models\SaleNote;
+use App\Models\Serie;
+use App\Models\StockProduct;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +62,9 @@ class DeliverySettlementService
 
     public function __construct(
         protected JugMovementService $jugService,
-        protected LoyaltyService $loyaltyService
+        protected LoyaltyService $loyaltyService,
+        protected DeliveryDocumentResolverService $documentResolver,
+        protected WhatsAppSenderService $whatsappSender
     ) {}
 
     /**
@@ -244,18 +254,240 @@ class DeliverySettlementService
                 $this->loyaltyService->accumulatePurchases($client, $eligibleCount);
             }
 
+            // Invariante B1: Descuento de stock en almacén para productos físicos inventariables
+            foreach ($lockedOrder->items as $item) {
+                if ($item->idproducto) {
+                    $stockProduct = StockProduct::where('idproducto', $item->idproducto)
+                        ->where('idalmacen', $idalmacen)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($stockProduct) {
+                        $stockProduct->update([
+                            'stock_actual' => max(0, (int) $stockProduct->stock_actual - (int) $item->cantidad),
+                        ]);
+                    }
+                }
+            }
+
+            // Emisión Automática de Comprobante (Factura 01, Boleta 03 o Nota de Venta 02)
+            $business = Business::query()->first();
+            $payMode = $this->resolvePayMode($metodoPago);
+            $issuedDocument = null;
+            $issuedKind = null;
+
+            $hasExistingDoc = (bool) ($lockedOrder->idfactura || $lockedOrder->idnotaventa);
+
+            if (! $hasExistingDoc && ($business?->facturacion_automatica_delivery ?? true)) {
+                $docType = $this->documentResolver->resolve($client, $finalTotal, $business);
+
+                $serieModel = Serie::where('idtipo_documento', (int) $docType->id)
+                    ->when($activeArqueo?->idcaja, fn ($q, $cajaId) => $q->where('idcaja', $cajaId))
+                    ->where('estado', 1)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $serieModel) {
+                    $serieModel = Serie::where('idtipo_documento', (int) $docType->id)
+                        ->where('estado', 1)
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if ($serieModel) {
+                    $correlativoActual = (int) $serieModel->correlativo;
+                    $formattedCorrelative = str_pad((string) $correlativoActual, 8, '0', STR_PAD_LEFT);
+                    $serieModel->update([
+                        'correlativo' => str_pad((string) ($correlativoActual + 1), 8, '0', STR_PAD_LEFT),
+                    ]);
+
+                    $todayDate = Carbon::now()->format('Y-m-d');
+                    $nowTime = Carbon::now()->format('H:i:s');
+                    $baseDocName = $serieModel->serie.'-'.$formattedCorrelative;
+
+                    if ((string) $docType->codigo === '02') {
+                        // Nota de Venta (Comprobante interno, sin reporte a SUNAT)
+                        $issuedDocument = SaleNote::create([
+                            'idtipo_comprobante' => (int) $docType->id,
+                            'serie' => $serieModel->serie,
+                            'correlativo' => $formattedCorrelative,
+                            'fecha_emision' => $todayDate,
+                            'fecha_vencimiento' => $todayDate,
+                            'hora' => $nowTime,
+                            'idcliente' => (int) $client->id,
+                            'modo_pago' => 1,
+                            'subtotal' => $baseTotal,
+                            'igv' => 0.00,
+                            'total' => $finalTotal,
+                            'monto_credito' => 0,
+                            'payment_breakdown' => [[
+                                'id' => $payMode->id,
+                                'descripcion' => $payMode->descripcion,
+                                'monto' => $finalTotal,
+                            ]],
+                            'observaciones' => "Entrega Delivery {$lockedOrder->codigo_orden}",
+                            'estado' => 1,
+                            'estado_whatsapp' => Billing::WPP_STATUS_PENDIENTE,
+                            'idusuario' => $effectiveUserId,
+                            'idarqueocaja' => $activeArqueo?->id,
+                            'vuelto' => 0.00,
+                        ]);
+
+                        foreach ($lockedOrder->items as $item) {
+                            DetailSaleNote::create([
+                                'idnotaventa' => $issuedDocument->id,
+                                'idproducto' => $item->idproducto ?: 1,
+                                'cantidad' => $item->cantidad,
+                                'igv' => 0.00,
+                                'precio_unitario' => $item->precio_unitario,
+                                'precio_total' => $item->subtotal,
+                                'descuento' => 0,
+                                'opcion' => 1,
+                                'idalmacen' => $idalmacen,
+                            ]);
+                        }
+
+                        if ($damageCost > 0) {
+                            DetailSaleNote::create([
+                                'idnotaventa' => $issuedDocument->id,
+                                'idproducto' => 1,
+                                'cantidad' => max(1, $damaged),
+                                'igv' => 0.00,
+                                'precio_unitario' => round($damageCost / max(1, $damaged), 2),
+                                'precio_total' => $damageCost,
+                                'descuento' => 0,
+                                'opcion' => 2,
+                                'idalmacen' => $idalmacen,
+                            ]);
+                        }
+
+                        $lockedOrder->update(['idnotaventa' => $issuedDocument->id]);
+                        $issuedKind = 'sale_note';
+                    } else {
+                        // Factura Electrónica (01) o Boleta Electrónica (03)
+                        $isTaxed = (bool) ($business?->cobrar_igv ?? false);
+                        $gravada = $isTaxed ? round($finalTotal / 1.18, 2) : $finalTotal;
+                        $igv = $isTaxed ? round($finalTotal - $gravada, 2) : 0.00;
+
+                        $issuedDocument = Billing::create([
+                            'idtipo_comprobante' => (int) $docType->id,
+                            'serie' => $serieModel->serie,
+                            'correlativo' => $formattedCorrelative,
+                            'fecha_emision' => $todayDate,
+                            'fecha_vencimiento' => $todayDate,
+                            'hora' => $nowTime,
+                            'idcliente' => (int) $client->id,
+                            'idmoneda' => 1,
+                            'idpago' => $payMode->id,
+                            'modo_pago' => 1,
+                            'sunat_forma_pago' => 'Contado',
+                            'exonerada' => 0,
+                            'inafecta' => 0,
+                            'gravada' => $gravada,
+                            'anticipo' => 0,
+                            'igv' => $igv,
+                            'icbper' => 0,
+                            'gratuita' => 0,
+                            'otros_cargos' => 0,
+                            'total' => $finalTotal,
+                            'monto_credito' => 0,
+                            'cuotas' => null,
+                            'payment_breakdown' => [[
+                                'id' => $payMode->id,
+                                'descripcion' => $payMode->descripcion,
+                                'monto' => $finalTotal,
+                            ]],
+                            'observaciones' => "Entrega Delivery {$lockedOrder->codigo_orden}",
+                            'cdr' => null,
+                            'anulado' => false,
+                            'estado_cpe' => null,
+                            'sunat_status' => Billing::SUNAT_STATUS_PENDIENTE,
+                            'estado_whatsapp' => Billing::WPP_STATUS_PENDIENTE,
+                            'errores' => null,
+                            'nticket' => $docType->codigo.'-'.$baseDocName,
+                            'idusuario' => $effectiveUserId,
+                            'idarqueocaja' => $activeArqueo?->id,
+                            'vuelto' => 0.00,
+                            'idalmacen' => $idalmacen,
+                        ]);
+
+                        foreach ($lockedOrder->items as $item) {
+                            $itemTotal = (float) $item->subtotal;
+                            $itemValorTotal = $isTaxed ? round($itemTotal / 1.18, 2) : $itemTotal;
+                            $itemIgv = $isTaxed ? round($itemTotal - $itemValorTotal, 2) : 0.00;
+                            $itemPrecioUnitario = (float) $item->precio_unitario;
+                            $itemValorUnitario = $isTaxed ? round($itemPrecioUnitario / 1.18, 2) : $itemPrecioUnitario;
+
+                            DetailBilling::create([
+                                'idfacturacion' => $issuedDocument->id,
+                                'idproducto' => $item->idproducto ?: 1,
+                                'cantidad' => $item->cantidad,
+                                'descuento' => 0,
+                                'igv' => $itemIgv,
+                                'icbper' => 0,
+                                'factor_icbper' => null,
+                                'cantidad_bolsas' => 0,
+                                'id_afectacion_igv' => $isTaxed ? 1 : 20,
+                                'precio_unitario' => $itemPrecioUnitario,
+                                'valor_unitario' => $itemValorUnitario,
+                                'valor_total' => $itemValorTotal,
+                                'precio_total' => $itemTotal,
+                            ]);
+                        }
+
+                        if ($damageCost > 0) {
+                            $dmgValor = $isTaxed ? round($damageCost / 1.18, 2) : $damageCost;
+                            $dmgIgv = $isTaxed ? round($damageCost - $dmgValor, 2) : 0.00;
+
+                            DetailBilling::create([
+                                'idfacturacion' => $issuedDocument->id,
+                                'idproducto' => 1,
+                                'cantidad' => max(1, $damaged),
+                                'descuento' => 0,
+                                'igv' => $dmgIgv,
+                                'icbper' => 0,
+                                'factor_icbper' => null,
+                                'cantidad_bolsas' => 0,
+                                'id_afectacion_igv' => $isTaxed ? 1 : 20,
+                                'precio_unitario' => round($damageCost / max(1, $damaged), 2),
+                                'valor_unitario' => round($dmgValor / max(1, $damaged), 2),
+                                'valor_total' => $dmgValor,
+                                'precio_total' => $damageCost,
+                            ]);
+                        }
+
+                        $lockedOrder->update(['idfactura' => $issuedDocument->id]);
+                        $issuedKind = 'billing';
+                    }
+                }
+            }
+
             // Invariante B1: Registrar pago en DetailPayment vinculado a idarqueocaja
             if ($estadoPago === 'pagado' && $finalTotal > 0 && $activeArqueo) {
-                $payMode = $this->resolvePayMode($metodoPago);
+                $docTypeId = $issuedDocument ? (int) $docType->id : 2;
+                $docId = $issuedDocument ? $issuedDocument->id : ($lockedOrder->idnotaventa ?: ($lockedOrder->idfactura ?: $lockedOrder->id));
 
                 DetailPayment::create([
-                    'idtipo_comprobante' => 2, // Nota de Venta / Recibo de Entrega
-                    'idfactura' => $lockedOrder->idnotaventa ?: ($lockedOrder->idfactura ?: $lockedOrder->id),
+                    'idtipo_comprobante' => $docTypeId,
+                    'idfactura' => $docId,
                     'idpago' => $payMode->id,
                     'monto' => $finalTotal,
                     'idarqueocaja' => $activeArqueo->id,
                     'estado' => 1,
                 ]);
+            }
+
+            // Despacho de Jobs en cola tras commit (afterCommit)
+            if ($issuedDocument) {
+                DB::afterCommit(function () use ($issuedDocument, $issuedKind, $lockedOrder) {
+                    if ($issuedDocument instanceof Billing) {
+                        EmitirComprobanteJob::dispatch($issuedDocument->id);
+                    }
+
+                    EnviarWhatsAppJob::dispatch($issuedKind, $issuedDocument->id, $lockedOrder->id);
+                });
             }
 
             return $lockedOrder;

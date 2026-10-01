@@ -121,6 +121,35 @@
         });
     });
 
+    $('body').on('click', '.btn-resend-whatsapp', function() {
+        let id = $(this).data('id');
+
+        $.ajax({
+            url: `{{ url('billings') }}/${id}/resend-whatsapp`,
+            method: "POST",
+            data: {
+                '_token': "{{ csrf_token() }}"
+            },
+            beforeSend: function() {
+                block_content('#layout-content');
+            },
+            success: function(r) {
+                close_block('#layout-content');
+                toast_msg(r.msg || 'Mensaje de WhatsApp procesado.', r.type || 'success');
+                $('#table').DataTable().ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                close_block('#layout-content');
+                toast_msg(
+                    xhr.responseJSON?.msg || 'No se pudo enviar el mensaje por WhatsApp.',
+                    xhr.responseJSON?.type || 'warning'
+                );
+                $('#table').DataTable().ajax.reload(null, false);
+            },
+            dataType: "json"
+        });
+    });
+
     $('body').on('click', '.btn-credit-note-billing', function() {
         const id = $(this).data('id');
         const documentLabel = $(this).data('document');

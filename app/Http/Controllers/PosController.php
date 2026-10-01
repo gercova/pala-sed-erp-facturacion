@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\EmitirComprobanteJob;
+use App\Jobs\EnviarWhatsAppJob;
 use App\Models\ArchingCash;
 use App\Models\Billing;
 use App\Models\Business;
@@ -1128,11 +1130,19 @@ class PosController extends Controller
             ) {
                 $this->validateStockBeforeSale($cart);
 
+                $lockedSerie = Serie::where('id', $serieModel->id)->lockForUpdate()->first();
+                $correlativoActual = (int) $lockedSerie->correlativo;
+                $formattedCorrelative = str_pad((string) $correlativoActual, 8, '0', STR_PAD_LEFT);
+                $lockedSerie->update([
+                    'correlativo' => str_pad((string) ($correlativoActual + 1), 8, '0', STR_PAD_LEFT),
+                ]);
+                $baseName = $documentType->codigo.'-'.$lockedSerie->serie.'-'.$formattedCorrelative;
+
                 if ((string) $documentType->codigo === '02') {
                     $document = SaleNote::create([
                         'idtipo_comprobante' => (int) $documentType->id,
-                        'serie' => $serieModel->serie,
-                        'correlativo' => $serieModel->correlativo,
+                        'serie' => $lockedSerie->serie,
+                        'correlativo' => $formattedCorrelative,
                         'fecha_emision' => $fechaEmision,
                         'fecha_vencimiento' => $fechaVencimiento,
                         'hora' => $hora,
@@ -1170,8 +1180,8 @@ class PosController extends Controller
                 } else {
                     $document = Billing::create([
                         'idtipo_comprobante' => (int) $documentType->id,
-                        'serie' => $serieModel->serie,
-                        'correlativo' => $serieModel->correlativo,
+                        'serie' => $lockedSerie->serie,
+                        'correlativo' => $formattedCorrelative,
                         'fecha_emision' => $fechaEmision,
                         'fecha_vencimiento' => $fechaVencimiento,
                         'hora' => $hora,
@@ -1199,6 +1209,8 @@ class PosController extends Controller
                         'idfactura_anular' => null,
                         'motivo' => null,
                         'estado_cpe' => null,
+                        'sunat_status' => Billing::SUNAT_STATUS_PENDIENTE,
+                        'estado_whatsapp' => Billing::WPP_STATUS_PENDIENTE,
                         'errores' => null,
                         'nticket' => $baseName,
                         'idusuario' => $idusuario,
@@ -1259,11 +1271,9 @@ class PosController extends Controller
                     }
                 }
 
-                $this->advanceSerieCorrelative($serieModel);
-
                 $successMessage = $documentKind === 'sale_note'
                     ? 'La nota de venta '.$baseName.' ha sido registrada correctamente.'
-                    : $this->resolveBillingSuccessMessage($document);
+                    : 'El comprobante '.$baseName.' ha sido registrado correctamente.';
 
                 return [
                     'document_id' => $documentId,
@@ -1285,14 +1295,16 @@ class PosController extends Controller
 
         $this->destroy_cart();
 
+        // Despacho asíncrono para SUNAT y WhatsApp (sin bloquear la caja)
         if ($result['document_kind'] === 'billing') {
-            $billingDoc = Billing::find($result['document_id']);
-            if ($billingDoc) {
-                $this->attemptSunatDispatch($billingDoc);
-                $billingDoc->refresh();
-                $result['msg'] = $this->resolveBillingSuccessMessage($billingDoc);
-            }
+            EmitirComprobanteJob::dispatch($result['document_id']);
         }
+
+        EnviarWhatsAppJob::dispatch(
+            $result['document_kind'],
+            $result['document_id'],
+            $request->input('from_delivery') ? (int) $request->input('from_delivery') : null
+        );
 
         // Si la venta proviene de un pedido de delivery, vincular el comprobante emitido
         $deliveryOrderId = session('from_delivery_order_id') ?? $request->input('from_delivery');

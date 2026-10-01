@@ -343,12 +343,80 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de Emisión Automática y WhatsApp Delivery -->
+                    <div class="card mb-4">
+                        <div class="card-header fw-bold text-dark d-flex align-items-center justify-content-between">
+                            <div>
+                                <i class="ri-truck-line me-1 align-middle text-primary"></i> Emisión Automática Delivery & WhatsApp
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                    id="facturacion_automatica_delivery" name="facturacion_automatica_delivery"
+                                    style="width: 44px; height: 22px; cursor: pointer;"
+                                    {{ ($empresa->facturacion_automatica_delivery ?? true) ? 'checked' : '' }}>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Regla de Tipo de Comprobante por Defecto</label>
+                                    <select name="tipo_documento_delivery_defecto" class="form-select">
+                                        <option value="auto" {{ ($empresa->tipo_documento_delivery_defecto ?? 'auto') === 'auto' ? 'selected' : '' }}>
+                                            Automático según documento (RUC &rarr; Factura, DNI &rarr; Boleta, Sin Doc &rarr; Nota de Venta)
+                                        </option>
+                                        <option value="03" {{ ($empresa->tipo_documento_delivery_defecto ?? '') === '03' ? 'selected' : '' }}>
+                                            Preferir Boleta de Venta (03)
+                                        </option>
+                                        <option value="01" {{ ($empresa->tipo_documento_delivery_defecto ?? '') === '01' ? 'selected' : '' }}>
+                                            Preferir Factura Electrónica (01)
+                                        </option>
+                                        <option value="02" {{ ($empresa->tipo_documento_delivery_defecto ?? '') === '02' ? 'selected' : '' }}>
+                                            Preferir Nota de Venta interna (02)
+                                        </option>
+                                    </select>
+                                    <small class="text-muted d-block mt-1">
+                                        En modo "Automático", si el cliente tiene RUC se emite Factura; si tiene DNI, Boleta; si no tiene documento o es público general, Nota de Venta.
+                                    </small>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Umbral SUNAT Boletas Sin DNI (S/)</label>
+                                    <input type="number" step="0.01" min="0" name="boleta_umbral_identidad" class="form-control"
+                                        value="{{ $empresa->boleta_umbral_identidad ?? '700.00' }}">
+                                    <small class="text-muted d-block mt-1">
+                                        Normativa SUNAT: Ventas mayores o iguales a S/ 700 requieren obligatoriamente identificación del adquirente. Si no se cuenta con DNI, se emite Nota de Venta para evitar rechazo 2014.
+                                    </small>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Instancia WhatsApp (Evolution / API)</label>
+                                    <input type="text" name="instancia_wpp" class="form-control"
+                                        placeholder="Ej. sede-central o nombre de instancia"
+                                        value="{{ $empresa->instancia_wpp }}">
+                                    <small class="text-muted d-block mt-1">
+                                        Identificador de la instancia configurada en el servidor WhatsApp.
+                                    </small>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">URL API WhatsApp</label>
+                                    <input type="url" name="url_api" class="form-control"
+                                        placeholder="Ej. https://wpp.midominio.com"
+                                        value="{{ $empresa->url_api }}">
+                                    <small class="text-muted d-block mt-1">
+                                        Endpoint base de la API de mensajería WhatsApp.
+                                    </small>
+                                </div>
+                            </div>
 
                             <div class="d-flex justify-content-end mt-4 pt-2 border-top">
                                 <button type="button" class="btn btn-primary px-4 btn-save-user">
                                     <i class="ri-shield-check-line me-1 align-middle"></i>
-                                    <span class="text-btn-user">Actualizar Credenciales</span>
-                                    <span class="text-save-user d-none">Actualizando...</span>
+                                    <span class="text-btn-user">Guardar Configuración</span>
+                                    <span class="text-save-user d-none">Guardando...</span>
                                     <span class="spinner-border spinner-border-sm d-none text-saving-user ms-1"></span>
                                 </button>
                             </div>

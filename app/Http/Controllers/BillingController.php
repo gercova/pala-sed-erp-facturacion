@@ -14,6 +14,7 @@ use App\Models\Warehouse;
 use App\Services\Ebilling\Payload\BillingPayloadBuilder;
 use App\Services\Ebilling\SunatDispatchService;
 use App\Services\Ebilling\Support\BusinessStoragePath;
+use App\Services\Water\WhatsAppSenderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -29,8 +30,7 @@ class BillingController extends Controller
         private readonly SunatDispatchService $dispatchService,
         private readonly BillingPayloadBuilder $payloadBuilder,
         private readonly BusinessStoragePath $storagePath,
-    ) {
-    }
+    ) {}
 
     public function index()
     {
@@ -139,17 +139,19 @@ class BillingController extends Controller
             $voucherSearch = trim((string) request()->input('columns.1.search.value'));
             $customerSearch = trim((string) request()->input('columns.2.search.value'));
             $totalSearch = trim((string) request()->input('columns.4.search.value'));
+            $sunatStatusSearch = trim((string) request()->input('columns.7.search.value'));
+            $whatsappStatusSearch = trim((string) request()->input('columns.8.search.value'));
 
             if ($voucherSearch !== '') {
                 if (strpos($voucherSearch, '-') !== false) {
                     [$serie, $correlativo] = array_pad(explode('-', $voucherSearch, 2), 2, '');
-                    $billings->where('billings.serie', 'like', '%' . trim($serie) . '%')
-                        ->where('billings.correlativo', 'like', '%' . trim($correlativo) . '%');
+                    $billings->where('billings.serie', 'like', '%'.trim($serie).'%')
+                        ->where('billings.correlativo', 'like', '%'.trim($correlativo).'%');
                 } else {
                     $billings->where(function ($query) use ($voucherSearch) {
-                        $query->where('billings.serie', 'like', '%' . $voucherSearch . '%')
-                            ->orWhere('billings.correlativo', 'like', '%' . $voucherSearch . '%')
-                            ->orWhere('type_documents.descripcion', 'like', '%' . $voucherSearch . '%');
+                        $query->where('billings.serie', 'like', '%'.$voucherSearch.'%')
+                            ->orWhere('billings.correlativo', 'like', '%'.$voucherSearch.'%')
+                            ->orWhere('type_documents.descripcion', 'like', '%'.$voucherSearch.'%');
                     });
                 }
             }
@@ -160,14 +162,51 @@ class BillingController extends Controller
 
             if ($customerSearch !== '') {
                 $billings->where(function ($query) use ($customerSearch) {
-                    $query->where('clients.nombres', 'like', '%' . $customerSearch . '%')
-                        ->orWhere('clients.nro_documento', 'like', '%' . $customerSearch . '%');
+                    $query->where('clients.nombres', 'like', '%'.$customerSearch.'%')
+                        ->orWhere('clients.nro_documento', 'like', '%'.$customerSearch.'%');
                 });
             }
 
             if ($totalSearch !== '') {
                 $normalizedTotal = str_replace(',', '.', $totalSearch);
-                $billings->where('billings.total', 'like', '%' . $normalizedTotal . '%');
+                $billings->where('billings.total', 'like', '%'.$normalizedTotal.'%');
+            }
+
+            if ($sunatStatusSearch !== '') {
+                if ($sunatStatusSearch === Billing::SUNAT_STATUS_ACEPTADO) {
+                    $billings->where(function ($query) {
+                        $query->where('billings.sunat_status', Billing::SUNAT_STATUS_ACEPTADO)
+                            ->orWhere(function ($q) {
+                                $q->where('billings.cdr', 1)->where('billings.estado_cpe', 0);
+                            });
+                    });
+                } elseif ($sunatStatusSearch === Billing::SUNAT_STATUS_RECHAZADO) {
+                    $billings->where(function ($query) {
+                        $query->where('billings.sunat_status', Billing::SUNAT_STATUS_RECHAZADO)
+                            ->orWhere(function ($q) {
+                                $q->where('billings.cdr', 1)->where('billings.estado_cpe', '>', 0);
+                            });
+                    });
+                } elseif ($sunatStatusSearch === Billing::SUNAT_STATUS_PENDIENTE) {
+                    $billings->where(function ($query) {
+                        $query->whereNull('billings.sunat_status')
+                            ->orWhere('billings.sunat_status', Billing::SUNAT_STATUS_PENDIENTE)
+                            ->orWhereNull('billings.cdr');
+                    });
+                } else {
+                    $billings->where('billings.sunat_status', $sunatStatusSearch);
+                }
+            }
+
+            if ($whatsappStatusSearch !== '') {
+                if ($whatsappStatusSearch === Billing::WPP_STATUS_PENDIENTE) {
+                    $billings->where(function ($query) {
+                        $query->whereNull('billings.estado_whatsapp')
+                            ->orWhere('billings.estado_whatsapp', Billing::WPP_STATUS_PENDIENTE);
+                    });
+                } else {
+                    $billings->where('billings.estado_whatsapp', $whatsappStatusSearch);
+                }
             }
         }
 
@@ -177,24 +216,24 @@ class BillingController extends Controller
                 return Carbon::parse((string) $billing->fecha_emision)->format('Y-m-d');
             })
             ->addColumn('comprobante', function ($billing) {
-                $documento = e($billing->serie . '-' . $billing->correlativo);
+                $documento = e($billing->serie.'-'.$billing->correlativo);
                 $tipo = e(mb_strtoupper((string) $billing->tipo_comprobante));
 
                 return '<div class="text-center">'
-                    . '<div class="fw-semibold">' . $documento . '</div>'
-                    . '<small class="text-muted">' . $tipo . '</small>'
-                    . '</div>';
+                    .'<div class="fw-semibold">'.$documento.'</div>'
+                    .'<small class="text-muted">'.$tipo.'</small>'
+                    .'</div>';
             })
             ->addColumn('cliente_info', function ($billing) {
                 return '<div class="billing-customer-cell">'
-                    . '<div class="billing-customer-name">' . e((string) $billing->cliente) . '</div>'
-                    . '<small class="billing-customer-doc">' . e((string) ($billing->dni_ruc ?: 'Sin documento')) . '</small>'
-                    . '</div>';
+                    .'<div class="billing-customer-name">'.e((string) $billing->cliente).'</div>'
+                    .'<small class="billing-customer-doc">'.e((string) ($billing->dni_ruc ?: 'Sin documento')).'</small>'
+                    .'</div>';
             })
             ->addColumn('almacen_badge', function ($billing) {
-                return '<span class="badge bg-light text-dark border">' . e((string) ($billing->almacen ?: 'Sin almacén')) . '</span>';
+                return '<span class="badge bg-light text-dark border">'.e((string) ($billing->almacen ?: 'Sin almacén')).'</span>';
             })
-            ->addColumn('total', fn ($billing) => '<div class="billing-total-chip">' . e($this->signo_pais() . ' ' . number_format((float) $billing->total, 2, '.', '')) . '</div>')
+            ->addColumn('total', fn ($billing) => '<div class="billing-total-chip">'.e($this->signo_pais().' '.number_format((float) $billing->total, 2, '.', '')).'</div>')
             ->addColumn('xml', function ($billing) {
                 $exists = $this->billingXmlExists($billing);
 
@@ -202,7 +241,7 @@ class BillingController extends Controller
                     return '<span class="text-muted">-</span>';
                 }
 
-                return '<a href="' . route('admin.billing_xml', $billing->id) . '" class="billing-file-link text-primary" target="_blank" title="Ver XML"><i class="fas fa-file-code"></i></a>';
+                return '<a href="'.route('admin.billing_xml', $billing->id).'" class="billing-file-link text-primary" target="_blank" title="Ver XML"><i class="fas fa-file-code"></i></a>';
             })
             ->addColumn('cdr_archivo', function ($billing) {
                 $exists = $this->billingCdrExists($billing);
@@ -211,24 +250,46 @@ class BillingController extends Controller
                     return '<span class="text-muted">-</span>';
                 }
 
-                return '<a href="' . route('admin.billing_cdr', $billing->id) . '" class="billing-file-link text-primary" target="_blank" title="Ver CDR"><i class="fas fa-file-invoice"></i></a>';
+                return '<a href="'.route('admin.billing_cdr', $billing->id).'" class="billing-file-link text-primary" target="_blank" title="Ver CDR"><i class="fas fa-file-invoice"></i></a>';
             })
             ->addColumn('sunat_badge', function ($billing) {
                 if ((bool) $billing->anulado) {
                     return '<span class="badge bg-dark-subtle text-dark">Anulado</span>';
                 }
 
-                if ($billing->cdr === null) {
-                    return '<span class="badge bg-light text-dark border">Pendiente</span>';
+                if ($billing->sunat_status === Billing::SUNAT_STATUS_ACEPTADO || ((int) $billing->cdr === 1 && (int) $billing->estado_cpe === 0)) {
+                    return '<span class="badge bg-success-subtle text-success"><i class="fas fa-check-circle me-1"></i>Aceptado</span>';
                 }
 
-                if ((int) $billing->cdr === 1 && (int) $billing->estado_cpe === 0) {
-                    return '<span class="badge bg-success-subtle text-success">Aceptado</span>';
+                if ($billing->sunat_status === Billing::SUNAT_STATUS_RECHAZADO || ((int) $billing->cdr === 1 && (int) $billing->estado_cpe > 0)) {
+                    return '<span class="badge bg-danger-subtle text-danger" title="'.e((string) $billing->errores).'"><i class="fas fa-times-circle me-1"></i>Rechazado</span>';
                 }
 
-                return (int) $billing->cdr === 1
-                    ? '<span class="badge bg-danger-subtle text-danger">Rechazado</span>'
-                    : '<span class="badge bg-danger-subtle text-danger">Observado</span>';
+                if ($billing->sunat_status === Billing::SUNAT_STATUS_ERROR_COMUNICACION) {
+                    return '<span class="badge bg-warning-subtle text-warning" title="'.e((string) $billing->errores).'"><i class="fas fa-exclamation-triangle me-1"></i>Error ('.(int) $billing->sunat_intentos.')</span>';
+                }
+
+                if ($billing->sunat_status === Billing::SUNAT_STATUS_ENVIADO) {
+                    return '<span class="badge bg-info-subtle text-info"><i class="fas fa-spinner fa-spin me-1"></i>Enviando</span>';
+                }
+
+                return '<span class="badge bg-light text-dark border">Pendiente</span>';
+            })
+            ->addColumn('whatsapp_badge', function ($billing) {
+                $status = $billing->estado_whatsapp ?? Billing::WPP_STATUS_PENDIENTE;
+                switch ($status) {
+                    case Billing::WPP_STATUS_ENVIADO:
+                        $dateFormatted = $billing->whatsapp_enviado_at ? Carbon::parse($billing->whatsapp_enviado_at)->format('d/m H:i') : '';
+
+                        return '<span class="badge bg-success-subtle text-success" title="Enviado: '.e((string) $billing->whatsapp_enviado_at).'"><i class="fab fa-whatsapp me-1"></i>Enviado '.$dateFormatted.'</span>';
+                    case Billing::WPP_STATUS_FALLIDO:
+                        return '<span class="badge bg-danger-subtle text-danger" title="'.e((string) ($billing->whatsapp_error ?: 'Error de envío')).'"><i class="fab fa-whatsapp me-1"></i>Falló ('.(int) $billing->whatsapp_intentos.')</span>';
+                    case Billing::WPP_STATUS_SIN_TELEFONO:
+                        return '<span class="badge bg-secondary-subtle text-secondary" title="Cliente sin teléfono registrado"><i class="fab fa-whatsapp me-1"></i>Sin telf.</span>';
+                    case Billing::WPP_STATUS_PENDIENTE:
+                    default:
+                        return '<span class="badge bg-light text-dark border"><i class="fab fa-whatsapp me-1"></i>Pendiente</span>';
+                }
             })
             ->addColumn('estado_badge', function ($billing) {
                 if ((bool) $billing->anulado) {
@@ -239,21 +300,25 @@ class BillingController extends Controller
             })
             ->addColumn('acciones', function ($billing) use ($allowCreditNoteAction, $allowDebitNoteAction) {
                 $menu = '<div class="dropdown">
-                            <a href="#" role="button" id="dropdownBilling' . (int) $billing->id . '" data-bs-toggle="dropdown" aria-expanded="false">
+                            <a href="#" role="button" id="dropdownBilling'.(int) $billing->id.'" data-bs-toggle="dropdown" aria-expanded="false">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 18H9V20H2V18ZM2 11H11V13H2V11ZM2 4H22V6H2V4ZM20.674 13.0251L21.8301 12.634L22.8301 14.366L21.914 15.1711C21.9704 15.4386 22 15.7158 22 16C22 16.2842 21.9704 16.5614 21.914 16.8289L22.8301 17.634L21.8301 19.366L20.674 18.9749C20.2635 19.3441 19.7763 19.6295 19.2391 19.8044L19 21H17L16.7609 19.8044C16.2237 19.6295 15.7365 19.3441 15.326 18.9749L14.1699 19.366L13.1699 17.634L14.086 16.8289C14.0296 16.5614 14 16.2842 14 16C14 15.7158 14.0296 15.4386 14.086 15.1711L13.1699 14.366L14.1699 12.634L15.326 13.0251C15.7365 12.6559 16.2237 12.3705 16.7609 12.1956L17 11H19L19.2391 12.1956C19.7763 12.3705 20.2635 12.6559 20.674 13.0251ZM18 18C19.1046 18 20 17.1046 20 16C20 14.8954 19.1046 14 18 14C16.8954 14 16 14.8954 16 16C16 17.1046 16.8954 18 18 18Z"></path></svg>
                             </a>
-                            <div class="dropdown-menu" aria-labelledby="dropdownBilling' . (int) $billing->id . '">
-                                <a class="dropdown-item btn-a4" data-id="' . (int) $billing->id . '" href="javascript:void(0);">
+                            <div class="dropdown-menu" aria-labelledby="dropdownBilling'.(int) $billing->id.'">
+                                <a class="dropdown-item btn-a4" data-id="'.(int) $billing->id.'" href="javascript:void(0);">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" class="menu-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M5 4H15V8H19V20H5V4ZM3.9985 2C3.44749 2 3 2.44405 3 2.9918V21.0082C3 21.5447 3.44476 22 3.9934 22H20.0066C20.5551 22 21 21.5489 21 20.9925L20.9997 7L16 2H3.9985ZM10.4999 7.5C10.4999 9.07749 10.0442 10.9373 9.27493 12.6534C8.50287 14.3757 7.46143 15.8502 6.37524 16.7191L7.55464 18.3321C10.4821 16.3804 13.7233 15.0421 16.8585 15.49L17.3162 13.5513C14.6435 12.6604 12.4999 9.98994 12.4999 7.5H10.4999ZM11.0999 13.4716C11.3673 12.8752 11.6042 12.2563 11.8037 11.6285C12.2753 12.3531 12.8553 13.0182 13.5101 13.5953C12.5283 13.7711 11.5665 14.0596 10.6352 14.4276C10.7999 14.1143 10.9551 13.7948 11.0999 13.4716Z"></path></svg>
                                     <span> A4</span>
                                 </a>
-                                <a class="dropdown-item btn-ticket" data-id="' . (int) $billing->id . '" href="javascript:void(0);">
+                                <a class="dropdown-item btn-ticket" data-id="'.(int) $billing->id.'" href="javascript:void(0);">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" class="menu-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M20 22H4C3.44772 22 3 21.5523 3 21V3C3 2.44772 3.44772 2 4 2H20C20.5523 2 21 2.44772 21 3V21C21 21.5523 20.5523 22 20 22ZM19 20V4H5V20H19ZM7 6H11V10H7V6ZM7 12H17V14H7V12ZM7 16H17V18H7V16ZM13 7H17V9H13V7Z"></path></svg>
                                     <span> Ticket</span>
+                                </a>
+                                <a class="dropdown-item btn-resend-whatsapp" data-id="'.(int) $billing->id.'" href="javascript:void(0);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" class="menu-icon text-success" viewBox="0 0 24 24" fill="currentColor"><path d="M12.001 2C6.478 2 2 6.478 2 12C2 13.845 2.502 15.573 3.376 17.062L2.051 21.909L7.009 20.612C8.455 21.492 10.168 22 12.001 22C17.523 22 22 17.522 22 12C22 6.478 17.523 2 12.001 2ZM16.634 16.366C16.442 16.908 15.681 17.332 15.084 17.461C14.676 17.549 14.137 17.615 12.344 16.872C10.052 15.922 8.572 13.585 8.458 13.433C8.344 13.281 7.531 12.203 7.531 11.087C7.531 9.971 8.099 9.429 8.327 9.195C8.517 9.001 8.828 8.913 9.132 8.913C9.231 8.913 9.321 8.918 9.402 8.922C9.64 8.932 9.759 8.946 9.916 9.322C10.113 9.792 10.59 10.957 10.648 11.075C10.706 11.193 10.764 11.352 10.686 11.508C10.608 11.664 10.54 11.733 10.424 11.868C10.308 12.003 10.201 12.109 10.085 12.254C9.979 12.378 9.858 12.512 9.992 12.742C10.126 12.972 10.588 13.725 11.272 14.333C12.154 15.118 12.871 15.368 13.125 15.474C13.379 15.58 13.531 15.558 13.673 15.394C13.815 15.23 14.28 14.693 14.444 14.461C14.608 14.229 14.772 14.263 15.006 14.349C15.24 14.435 16.49 15.051 16.744 15.178C16.998 15.305 17.168 15.368 17.225 15.464C17.283 15.56 17.283 16.024 16.634 16.366Z"></path></svg>
+                                    <span> Reenviar WhatsApp</span>
                                 </a>';
 
                 if (! ((int) $billing->cdr === 1 && (int) $billing->estado_cpe === 0) && ! (bool) $billing->anulado) {
-                    $menu .= '<a class="dropdown-item btn-dispatch" data-id="' . (int) $billing->id . '" href="javascript:void(0);">
+                    $menu .= '<a class="dropdown-item btn-dispatch" data-id="'.(int) $billing->id.'" href="javascript:void(0);">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" class="menu-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4L21 12L3.4 3.6L3.4 10.2L16 12L3.4 13.8L3.4 20.4Z"></path></svg>
                                     <span> Enviar a SUNAT</span>
                                 </a>';
@@ -261,14 +326,14 @@ class BillingController extends Controller
 
                 if ((int) $billing->cdr === 1 && (int) $billing->estado_cpe === 0 && ! (bool) $billing->anulado) {
                     if ($allowCreditNoteAction && in_array((string) $billing->tipo_comprobante_codigo, ['01', '03'], true)) {
-                        $menu .= '<a class="dropdown-item btn-credit-note-billing" data-id="' . (int) $billing->id . '" data-document="' . e(trim($billing->serie . '-' . $billing->correlativo)) . '" href="javascript:void(0);">
+                        $menu .= '<a class="dropdown-item btn-credit-note-billing" data-id="'.(int) $billing->id.'" data-document="'.e(trim($billing->serie.'-'.$billing->correlativo)).'" href="javascript:void(0);">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" class="menu-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6H8L12.5 1.5L11.08 0.08L4.17 7L11.08 13.92L12.5 12.5L8 8H20V18H4V10H2V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.9 21.1 6 20 6Z"></path></svg>
                                     <span> Anular con nota de credito</span>
                                 </a>';
                     }
 
                     if ($allowDebitNoteAction && in_array((string) $billing->tipo_comprobante_codigo, ['01', '03'], true)) {
-                        $menu .= '<a class="dropdown-item btn-debit-note-billing" data-id="' . (int) $billing->id . '" data-document="' . e(trim($billing->serie . '-' . $billing->correlativo)) . '" href="javascript:void(0);">
+                        $menu .= '<a class="dropdown-item btn-debit-note-billing" data-id="'.(int) $billing->id.'" data-document="'.e(trim($billing->serie.'-'.$billing->correlativo)).'" href="javascript:void(0);">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" class="menu-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H13V19H11V13H5V11H11V5H13V11H19V13Z"></path></svg>
                                     <span> Nota de debito</span>
                                 </a>';
@@ -279,7 +344,7 @@ class BillingController extends Controller
 
                 return $menu;
             })
-            ->rawColumns(['comprobante', 'cliente_info', 'almacen_badge', 'total', 'xml', 'cdr_archivo', 'sunat_badge', 'estado_badge', 'acciones'])
+            ->rawColumns(['comprobante', 'cliente_info', 'almacen_badge', 'total', 'xml', 'cdr_archivo', 'sunat_badge', 'whatsapp_badge', 'estado_badge', 'acciones'])
             ->toJson();
     }
 
@@ -305,7 +370,7 @@ class BillingController extends Controller
             ]);
         }
 
-        $baseName = trim((string) ($billing->nticket ?: $billing->typeDocument?->codigo . '-' . $billing->serie . '-' . $billing->correlativo));
+        $baseName = trim((string) ($billing->nticket ?: $billing->typeDocument?->codigo.'-'.$billing->serie.'-'.$billing->correlativo));
         $ticket = $this->buildBillingTicket($billing, $baseName);
 
         return response()->json([
@@ -336,7 +401,7 @@ class BillingController extends Controller
             ]);
         }
 
-        $baseName = trim((string) ($billing->nticket ?: $billing->typeDocument?->codigo . '-' . $billing->serie . '-' . $billing->correlativo));
+        $baseName = trim((string) ($billing->nticket ?: $billing->typeDocument?->codigo.'-'.$billing->serie.'-'.$billing->correlativo));
         $pdf = $this->buildBillingA4($billing, $baseName);
 
         return response()->json([
@@ -377,15 +442,39 @@ class BillingController extends Controller
             ], 422);
         }
 
+        $billing->increment('sunat_intentos');
+        $billing->update([
+            'sunat_ultimo_intento_at' => now(),
+            'sunat_status' => Billing::SUNAT_STATUS_ENVIADO,
+        ]);
+
         try {
             $result = $this->dispatchService->dispatch($billing);
+            $billing->refresh();
+            if ($result['ok'] ?? false) {
+                $billing->update(['sunat_status' => Billing::SUNAT_STATUS_ACEPTADO]);
+            } elseif ((int) $billing->cdr === 1 && (int) $billing->estado_cpe > 0) {
+                $billing->update(['sunat_status' => Billing::SUNAT_STATUS_RECHAZADO]);
+            } else {
+                $billing->update(['sunat_status' => Billing::SUNAT_STATUS_ERROR_COMUNICACION]);
+            }
         } catch (InvalidArgumentException $exception) {
+            $billing->update([
+                'sunat_status' => Billing::SUNAT_STATUS_RECHAZADO,
+                'errores' => $exception->getMessage(),
+            ]);
+
             return response()->json([
                 'status' => false,
                 'msg' => $exception->getMessage(),
                 'type' => 'warning',
             ], 422);
         } catch (\Throwable $exception) {
+            $billing->update([
+                'sunat_status' => Billing::SUNAT_STATUS_ERROR_COMUNICACION,
+                'errores' => $exception->getMessage(),
+            ]);
+
             return response()->json([
                 'status' => false,
                 'msg' => $exception->getMessage() ?: 'No se pudo procesar el envío a SUNAT.',
@@ -394,12 +483,25 @@ class BillingController extends Controller
         }
 
         $billing->refresh();
-        $baseName = trim((string) ($billing->nticket ?: $billing->typeDocument?->codigo . '-' . $billing->serie . '-' . $billing->correlativo));
+        $baseName = trim((string) ($billing->nticket ?: $billing->typeDocument?->codigo.'-'.$billing->serie.'-'.$billing->correlativo));
         $this->buildBillingTicket($billing, $baseName);
 
         return response()->json([
             'status' => (bool) ($result['ok'] ?? false),
             'msg' => (string) ($result['message'] ?? 'Se procesó el envío a SUNAT.'),
+            'type' => (bool) ($result['ok'] ?? false) ? 'success' : 'warning',
+        ], (bool) ($result['ok'] ?? false) ? 200 : 422);
+    }
+
+    public function resend_whatsapp(int $id, WhatsAppSenderService $service)
+    {
+        $billing = $this->findBillingOrFail($id);
+
+        $result = $service->sendBilling($billing);
+
+        return response()->json([
+            'status' => (bool) ($result['ok'] ?? false),
+            'msg' => (string) ($result['message'] ?? 'Notificación WhatsApp procesada.'),
             'type' => (bool) ($result['ok'] ?? false) ? 'success' : 'warning',
         ], (bool) ($result['ok'] ?? false) ? 200 : 422);
     }
@@ -481,7 +583,7 @@ class BillingController extends Controller
         if ($existingCreditNote && (int) ($existingCreditNote->cdr ?? 0) === 1 && (int) ($existingCreditNote->estado_cpe ?? -1) === 0) {
             return response()->json([
                 'status' => false,
-                'msg' => 'Ya existe una nota de credito aceptada para este comprobante: ' . $existingCreditNote->serie . '-' . $existingCreditNote->correlativo . '.',
+                'msg' => 'Ya existe una nota de credito aceptada para este comprobante: '.$existingCreditNote->serie.'-'.$existingCreditNote->correlativo.'.',
                 'type' => 'warning',
             ], 422);
         }
@@ -524,7 +626,7 @@ class BillingController extends Controller
                     ? 'Nota de credito emitida correctamente. SUNAT acepto la anulacion.'
                     : 'La nota de credito se registro, pero quedo pendiente de envio a SUNAT.',
                 'detail' => (string) ($result['message'] ?? ''),
-                'documento' => trim((string) ($creditNote->serie . '-' . $creditNote->correlativo)),
+                'documento' => trim((string) ($creditNote->serie.'-'.$creditNote->correlativo)),
                 'type' => (bool) ($result['ok'] ?? false) ? 'success' : 'warning',
             ], (bool) ($result['ok'] ?? false) ? 200 : 422);
         } catch (\Throwable $exception) {
@@ -532,7 +634,7 @@ class BillingController extends Controller
                 'status' => false,
                 'msg' => 'La nota de credito se registro, pero no pudo enviarse a SUNAT en este momento.',
                 'detail' => $exception->getMessage(),
-                'documento' => trim((string) ($creditNote->serie . '-' . $creditNote->correlativo)),
+                'documento' => trim((string) ($creditNote->serie.'-'.$creditNote->correlativo)),
                 'type' => 'warning',
             ], 422);
         }
@@ -633,7 +735,7 @@ class BillingController extends Controller
                     ? 'Nota de debito emitida correctamente. SUNAT acepto el documento.'
                     : 'La nota de debito se registro, pero quedo pendiente de envio a SUNAT.',
                 'detail' => (string) ($result['message'] ?? ''),
-                'documento' => trim((string) ($debitNote->serie . '-' . $debitNote->correlativo)),
+                'documento' => trim((string) ($debitNote->serie.'-'.$debitNote->correlativo)),
                 'type' => (bool) ($result['ok'] ?? false) ? 'success' : 'warning',
             ], (bool) ($result['ok'] ?? false) ? 200 : 422);
         } catch (\Throwable $exception) {
@@ -641,7 +743,7 @@ class BillingController extends Controller
                 'status' => false,
                 'msg' => 'La nota de debito se registro, pero no pudo enviarse a SUNAT en este momento.',
                 'detail' => $exception->getMessage(),
-                'documento' => trim((string) ($debitNote->serie . '-' . $debitNote->correlativo)),
+                'documento' => trim((string) ($debitNote->serie.'-'.$debitNote->correlativo)),
                 'type' => 'warning',
             ], 422);
         }
@@ -662,18 +764,18 @@ class BillingController extends Controller
             ->where('idfacturacion', $billing->id)
             ->get();
 
-        $formatter = new NumeroALetras();
+        $formatter = new NumeroALetras;
         $qrImage = $this->ensureBillingQrImage($billing);
         $data = [
             'name' => $name,
             'business' => $business,
             'document_label' => $billing->typeDocument?->descripcion ?? 'COMPROBANTE',
-            'document_number' => $billing->serie . ' - ' . $billing->correlativo,
+            'document_number' => $billing->serie.' - '.$billing->correlativo,
             'customer_name' => $billing->customer?->nombres ?? 'Cliente',
             'customer_document_label' => $billing->customer?->tipoDocumento?->descripcion ?? 'Documento',
             'customer_document_value' => $billing->customer?->nro_documento ?? '-',
             'customer_address' => $billing->customer?->direccion ?? '-',
-            'issued_at' => date('d/m/Y', strtotime((string) $billing->fecha_emision)) . ' ' . $billing->hora,
+            'issued_at' => date('d/m/Y', strtotime((string) $billing->fecha_emision)).' '.$billing->hora,
             'seller' => mb_strtoupper((string) ($billing->user->user ?? '')),
             'items' => $details,
             'subtotal' => $billing->gravada,
@@ -691,13 +793,13 @@ class BillingController extends Controller
         $path = public_path('files/billings/ticket');
         File::ensureDirectoryExists($path);
 
-        $pdfPath = $path . DIRECTORY_SEPARATOR . $name . '.pdf';
+        $pdfPath = $path.DIRECTORY_SEPARATOR.$name.'.pdf';
         $pdf = Pdf::loadView('admin.pos.ticket_document', $data)->setPaper([0, 0, 226.77, 900.00], 'portrait');
         $pdf->save($pdfPath);
 
         return [
             'path' => $pdfPath,
-            'url' => asset('files/billings/ticket/' . $name . '.pdf'),
+            'url' => asset('files/billings/ticket/'.$name.'.pdf'),
         ];
     }
 
@@ -716,7 +818,7 @@ class BillingController extends Controller
             ->where('idfacturacion', $billing->id)
             ->get();
 
-        $formatter = new NumeroALetras();
+        $formatter = new NumeroALetras;
         $data = [
             'quote' => (object) [
                 'serie' => $billing->serie,
@@ -741,13 +843,13 @@ class BillingController extends Controller
         $path = public_path('files/billings/a4');
         File::ensureDirectoryExists($path);
 
-        $pdfPath = $path . DIRECTORY_SEPARATOR . $name . '.pdf';
+        $pdfPath = $path.DIRECTORY_SEPARATOR.$name.'.pdf';
         $pdf = Pdf::loadView('admin.quotes.pdf', $data)->setPaper('A4', 'portrait');
         $pdf->save($pdfPath);
 
         return [
             'path' => $pdfPath,
-            'url' => asset('files/billings/a4/' . $name . '.pdf'),
+            'url' => asset('files/billings/a4/'.$name.'.pdf'),
         ];
     }
 
@@ -764,8 +866,8 @@ class BillingController extends Controller
             return null;
         }
 
-        $filename = trim((string) ($billing->serie . '-' . $billing->correlativo)) . '.png';
-        $relativePath = 'files/billings/qr/' . $filename;
+        $filename = trim((string) ($billing->serie.'-'.$billing->correlativo)).'.png';
+        $relativePath = 'files/billings/qr/'.$filename;
         $absolutePath = public_path($relativePath);
 
         if (! is_file($absolutePath)) {
@@ -848,28 +950,28 @@ class BillingController extends Controller
     {
         $business = Business::findOrFail(1);
         $typeCode = trim((string) ($billing->tipo_comprobante_codigo ?? $billing->typeDocument?->codigo ?? ''));
-        $baseName = $business->ruc . '-' . $typeCode . '-' . $billing->serie . '-' . $billing->correlativo;
+        $baseName = $business->ruc.'-'.$typeCode.'-'.$billing->serie.'-'.$billing->correlativo;
 
-        return $this->storagePath->xmlDirectory($business) . DIRECTORY_SEPARATOR . $baseName . '.XML';
+        return $this->storagePath->xmlDirectory($business).DIRECTORY_SEPARATOR.$baseName.'.XML';
     }
 
     protected function billingCdrZipPath($billing): string
     {
         $business = Business::findOrFail(1);
         $typeCode = trim((string) ($billing->tipo_comprobante_codigo ?? $billing->typeDocument?->codigo ?? ''));
-        $baseName = $business->ruc . '-' . $typeCode . '-' . $billing->serie . '-' . $billing->correlativo;
+        $baseName = $business->ruc.'-'.$typeCode.'-'.$billing->serie.'-'.$billing->correlativo;
 
-        return $this->storagePath->cdrDirectory($business) . DIRECTORY_SEPARATOR . 'R-' . $baseName . '.ZIP';
+        return $this->storagePath->cdrDirectory($business).DIRECTORY_SEPARATOR.'R-'.$baseName.'.ZIP';
     }
 
     protected function billingCdrXmlPath($billing): string
     {
         $business = Business::findOrFail(1);
         $typeCode = trim((string) ($billing->tipo_comprobante_codigo ?? $billing->typeDocument?->codigo ?? ''));
-        $baseName = $business->ruc . '-' . $typeCode . '-' . $billing->serie . '-' . $billing->correlativo;
-        $folder = $this->storagePath->cdrDirectory($business) . DIRECTORY_SEPARATOR . 'R-' . $baseName;
-        $upper = $folder . DIRECTORY_SEPARATOR . 'R-' . $baseName . '.XML';
-        $lower = $folder . DIRECTORY_SEPARATOR . 'R-' . $baseName . '.xml';
+        $baseName = $business->ruc.'-'.$typeCode.'-'.$billing->serie.'-'.$billing->correlativo;
+        $folder = $this->storagePath->cdrDirectory($business).DIRECTORY_SEPARATOR.'R-'.$baseName;
+        $upper = $folder.DIRECTORY_SEPARATOR.'R-'.$baseName.'.XML';
+        $lower = $folder.DIRECTORY_SEPARATOR.'R-'.$baseName.'.xml';
 
         return is_file($upper) ? $upper : $lower;
     }

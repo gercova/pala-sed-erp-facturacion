@@ -163,7 +163,7 @@ class BusinessController extends Controller
         $logoName = $empresa->logo;
 
         if ($logo) {
-            $logoName = Str::slug((string) $request->input('razon_social')) . '-' . now()->format('YmdHis') . '.' . strtolower((string) $logo->getClientOriginalExtension());
+            $logoName = Str::slug((string) $request->input('razon_social')).'-'.now()->format('YmdHis').'.'.strtolower((string) $logo->getClientOriginalExtension());
             File::ensureDirectoryExists(public_path('files/logos'));
             $logo->move(public_path('files/logos'), $logoName);
         }
@@ -189,7 +189,7 @@ class BusinessController extends Controller
             'status' => true,
             'msg' => 'Datos actualizados correctamente',
             'type' => 'success',
-            'logo_url' => $this->resolveBusinessLogoUrl($empresa) . '?v=' . time(),
+            'logo_url' => $this->resolveBusinessLogoUrl($empresa).'?v='.time(),
         ]);
     }
 
@@ -253,10 +253,10 @@ class BusinessController extends Controller
 
         if ($certificate) {
             $directory = public_path('api_sunat');
-            $fileName = trim((string) $empresa->ruc) . '.pfx';
+            $fileName = trim((string) $empresa->ruc).'.pfx';
             File::ensureDirectoryExists($directory);
             $certificate->move($directory, $fileName);
-            $certificatePath = 'api_sunat/' . $fileName;
+            $certificatePath = 'api_sunat/'.$fileName;
         }
 
         $empresa->update([
@@ -269,6 +269,11 @@ class BusinessController extends Controller
             'gre_client_id' => trim((string) $request->input('gre_client_id')),
             'gre_client_secret' => trim((string) $request->input('gre_client_secret')),
             'certificado' => $certificatePath,
+            'facturacion_automatica_delivery' => $request->boolean('facturacion_automatica_delivery'),
+            'tipo_documento_delivery_defecto' => $request->input('tipo_documento_delivery_defecto', 'auto'),
+            'boleta_umbral_identidad' => (float) ($request->input('boleta_umbral_identidad') ?: 700.00),
+            'instancia_wpp' => trim((string) $request->input('instancia_wpp')),
+            'url_api' => trim((string) $request->input('url_api')),
         ]);
 
         return response()->json([
@@ -277,7 +282,7 @@ class BusinessController extends Controller
                 ? 'Credenciales actualizadas y certificado cargado correctamente.'
                 : 'Datos actualizados correctamente',
             'type' => 'success',
-            'certificate_name' => !empty($certificatePath) ? basename((string) $certificatePath) : null,
+            'certificate_name' => ! empty($certificatePath) ? basename((string) $certificatePath) : null,
         ]);
     }
 
@@ -287,6 +292,6 @@ class BusinessController extends Controller
             return asset('files/empty_logo.png');
         }
 
-        return asset('files/logos/' . ltrim((string) $business->logo, '/'));
+        return asset('files/logos/'.ltrim((string) $business->logo, '/'));
     }
 }

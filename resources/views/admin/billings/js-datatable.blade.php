@@ -43,7 +43,8 @@
                 { data: 'total', name: 'billings.total', className: 'text-center' },
                 { data: 'xml', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'cdr_archivo', orderable: false, searchable: false, className: 'text-center' },
-                { data: 'sunat_badge', orderable: false, searchable: false, className: 'text-center' },
+                { data: 'sunat_badge', name: 'billings.sunat_status', orderable: false, searchable: true, className: 'text-center' },
+                { data: 'whatsapp_badge', name: 'billings.estado_whatsapp', orderable: false, searchable: true, className: 'text-center' },
                 { data: 'estado_badge', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'acciones', orderable: false, searchable: false, className: 'text-center' }
             ],
@@ -70,6 +71,14 @@
 
         $('#total-filter').on('keyup change', function() {
             datatable.column(4).search(this.value).draw();
+        });
+
+        $('#sunat-filter').on('change', function() {
+            datatable.column(7).search(this.value).draw();
+        });
+
+        $('#whatsapp-filter').on('change', function() {
+            datatable.column(8).search(this.value).draw();
         });
     });
 </script>

@@ -72,22 +72,23 @@ Route::get('/home/reporte-ingresos', [HomeController::class, 'reporteIngresos'])
 Route::get('/home/metodo-pagos', [HomeController::class, 'metodosPagoVentas'])->name('home.metodo_pagos')->middleware(['auth', 'can:admin.home']);
 
 Route::controller(Businesscontroller::class)->prefix('business')->middleware(['auth', 'can:admin.business'])->group(function () {
-    Route::get('/', 'index')->name('admin.business');
-    Route::post('/load-ubigeo', 'load_ubigeo')->name('admin.load_ubigeo');
-    Route::post('/load-provinces', 'load_provinces')->name('admin.load_provinces');
-    Route::post('/load-districts', 'load_districts')->name('admin.load_districts');
-    Route::post('/load-logo', 'load_logo')->name('business.load_logo');
-    Route::post('/save-info', 'save_info')->name('business.save_info');
-    Route::post('/save-sunat', 'save_sunat')->name('business.save_sunat');
+    Route::get('/',                 'index')->name('admin.business');
+    Route::post('/load-ubigeo',     'load_ubigeo')->name('admin.load_ubigeo');
+    Route::post('/load-provinces',  'load_provinces')->name('admin.load_provinces');
+    Route::post('/load-districts',  'load_districts')->name('admin.load_districts');
+    Route::post('/load-logo',       'load_logo')->name('business.load_logo');
+    Route::post('/save-info',       'save_info')->name('business.save_info');
+    Route::post('/save-sunat',      'save_sunat')->name('business.save_sunat');
+    Route::post('/save-whatsapp',   'save_whatsapp')->name('business.save_whatsapp');
 });
 
 Route::controller(CashController::class)->prefix('cashes')->middleware(['auth', 'can:admin.cashes'])->group(function () {
-    Route::get('/', 'index')->name('admin.cashes');
-    Route::get('/get', 'get')->name('cashes.get');
-    Route::post('/save', 'save')->name('cashes.save');
-    Route::post('/detail', 'detail')->name('cashes.detail');
-    Route::post('/store', 'store')->name('cashes.store');
-    Route::post('/delete', 'delete')->name('cashes.delete');
+    Route::get('/',                 'index')->name('admin.cashes');
+    Route::get('/get',              'get')->name('cashes.get');
+    Route::post('/save',            'save')->name('cashes.save');
+    Route::post('/detail',          'detail')->name('cashes.detail');
+    Route::post('/store',           'store')->name('cashes.store');
+    Route::post('/delete',          'delete')->name('cashes.delete');
 });
 
 Route::controller(PayModeController::class)->prefix('pay-modes')->middleware(['auth', 'can:admin.paymodes'])->group(function () {
@@ -112,9 +113,9 @@ Route::controller(CountryController::class)->prefix('countries')->group(function
     Route::get('/', 'index')->name('admin.countries')->middleware('auth');
     Route::get('/get', 'get')->name('countries.get');
     Route::post('/save', 'save')->name('countries.save');
-    Route::post('/detail', 'detail')->name('countries.detail');
+    Route::post('/detail', 'detail')->name('countries.detail')->middleware('auth');
     Route::post('/store', 'store')->name('countries.store');
-    Route::post('/delete', 'delete')->name('countries.delete');
+    Route::post('/delete', 'delete')->name('countries.delete')->middleware('auth');
 });
 
 Route::controller(ClientController::class)->prefix('clients')->middleware(['auth', 'can:admin.clients'])->group(function () {
@@ -271,6 +272,7 @@ Route::controller(BillingController::class)->prefix('billings')->middleware(['au
     Route::get('/{id}/xml', 'download_xml')->name('admin.billing_xml');
     Route::get('/{id}/cdr', 'download_cdr')->name('admin.billing_cdr');
     Route::post('/{id}/dispatch', 'dispatch')->name('admin.dispatch_billing');
+    Route::post('/{id}/resend-whatsapp', 'resend_whatsapp')->name('admin.resend_whatsapp_billing');
 });
 
 Route::controller(ShipmentGuideController::class)->prefix('shipment-guides')->middleware(['auth', 'can:admin.shipment_guides'])->group(function () {
@@ -299,6 +301,11 @@ Route::controller(BillingReportController::class)->prefix('billings/reports')->m
     Route::get('/credit-notes/data', 'getCreditNotes')->name('report.billings.credit_notes.data')->middleware('can:report.billings.credit_notes');
     Route::get('/credit-notes/pdf', 'creditNotesPdf')->name('report.billings.credit_notes.pdf')->middleware('can:report.billings.credit_notes');
     Route::get('/credit-notes/excel', 'creditNotesExcel')->name('report.billings.credit_notes.excel')->middleware('can:report.billings.credit_notes');
+
+    Route::get('/debit-notes', 'debitNotes')->name('report.billings.debit_notes')->middleware('can:report.billings.debit_notes');
+    Route::get('/debit-notes/data', 'getDebitNotes')->name('report.billings.debit_notes.data')->middleware('can:report.billings.debit_notes');
+    Route::get('/debit-notes/pdf', 'debitNotesPdf')->name('report.billings.debit_notes.pdf')->middleware('can:report.billings.debit_notes');
+    Route::get('/debit-notes/excel', 'debitNotesExcel')->name('report.billings.debit_notes.excel')->middleware('can:report.billings.debit_notes');
 });
 
 Route::controller(ArchingCashController::class)->prefix('archingcash')->middleware(['auth', 'can:admin.arching_cashes'])->group(function () {
@@ -342,7 +349,6 @@ Route::get('/reportes/ventas', [ReportSalesController::class, 'index'])->name('r
 Route::get('/reportes/ventas/data', [ReportSalesController::class, 'getSalesReport'])->name('report.sales.data')->middleware(['auth', 'can:report.sales.index']);
 Route::get('/by-product', [ReportSalesController::class, 'salesByProductIndex'])->name('report.sales.by_product.index')->middleware(['auth', 'can:report.sales.by_product.index']);
 Route::get('/reports/sales/products', [ReportSalesController::class, 'getSalesByProduct'])->name('report.sales.products')->middleware(['auth', 'can:report.sales.by_product.index']);
-
 Route::get('/reportes/pagos', [ReportPaymentController::class, 'index'])->name('report.payments.index')->middleware(['auth', 'can:report.payments.index']);
 Route::get('/reports/sales/payment-methods', [ReportPaymentController::class, 'getSalesByPaymentMethod'])->name('report.sales.payment_methods')->middleware(['auth', 'can:report.payments.index']);
 

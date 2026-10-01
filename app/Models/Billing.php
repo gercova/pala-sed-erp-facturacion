@@ -43,6 +43,13 @@ class Billing extends Model
         'idfactura_anular',
         'motivo',
         'estado_cpe',
+        'sunat_status',
+        'sunat_intentos',
+        'sunat_ultimo_intento_at',
+        'estado_whatsapp',
+        'whatsapp_error',
+        'whatsapp_intentos',
+        'whatsapp_enviado_at',
         'errores',
         'nticket',
         'idusuario',
@@ -52,9 +59,31 @@ class Billing extends Model
         'idalmacen',
     ];
 
+    public const SUNAT_STATUS_PENDIENTE = 'pendiente';
+
+    public const SUNAT_STATUS_ENVIADO = 'enviado';
+
+    public const SUNAT_STATUS_ACEPTADO = 'aceptado';
+
+    public const SUNAT_STATUS_RECHAZADO = 'rechazado';
+
+    public const SUNAT_STATUS_ERROR_COMUNICACION = 'error_comunicacion';
+
+    public const WPP_STATUS_PENDIENTE = 'pendiente';
+
+    public const WPP_STATUS_ENVIADO = 'enviado';
+
+    public const WPP_STATUS_FALLIDO = 'fallido';
+
+    public const WPP_STATUS_SIN_TELEFONO = 'sin_telefono';
+
     protected $casts = [
         'fecha_emision' => 'date',
         'fecha_vencimiento' => 'date',
+        'sunat_ultimo_intento_at' => 'datetime',
+        'whatsapp_enviado_at' => 'datetime',
+        'sunat_intentos' => 'integer',
+        'whatsapp_intentos' => 'integer',
         'exonerada' => 'decimal:2',
         'inafecta' => 'decimal:2',
         'gravada' => 'decimal:2',

@@ -35,6 +35,9 @@ class Business extends Model
         'gre_client_id',
         'gre_client_secret',
         'instancia_wpp',
+        'facturacion_automatica_delivery',
+        'tipo_documento_delivery_defecto',
+        'boleta_umbral_identidad',
         'cobrar_igv',
         'yape_qr',
         'plin_qr',
@@ -44,6 +47,8 @@ class Business extends Model
     protected $casts = [
         'vencimiento_certificado' => 'date',
         'cobrar_igv' => 'boolean',
+        'facturacion_automatica_delivery' => 'boolean',
+        'boleta_umbral_identidad' => 'decimal:2',
     ];
 
     public static function getClientAuthMethod(): string

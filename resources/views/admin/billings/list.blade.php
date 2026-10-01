@@ -136,16 +136,17 @@
                 <table id="table" class="table table-hover table-sm">
                     <thead>
                         <tr>
-                            <th width="12%" class="text-center">Fecha</th>
-                            <th width="18%" class="text-center">Comprobante</th>
+                            <th width="10%" class="text-center">Fecha</th>
+                            <th width="15%" class="text-center">Comprobante</th>
                             <th>Cliente</th>
-                            <th width="12%" class="text-center">Almacén</th>
-                            <th width="12%" class="text-center">Total</th>
-                            <th width="6%" class="text-center">XML</th>
-                            <th width="6%" class="text-center">CDR</th>
+                            <th width="10%" class="text-center">Almacén</th>
+                            <th width="10%" class="text-center">Total</th>
+                            <th width="5%" class="text-center">XML</th>
+                            <th width="5%" class="text-center">CDR</th>
                             <th width="10%" class="text-center">SUNAT</th>
-                            <th width="10%" class="text-center">Estado</th>
-                            <th width="12%" class="text-center">Acciones</th>
+                            <th width="11%" class="text-center">WhatsApp</th>
+                            <th width="8%" class="text-center">Estado</th>
+                            <th width="10%" class="text-center">Acciones</th>
                         </tr>
                         <tr>
                             <th>
@@ -163,7 +164,25 @@
                             </th>
                             <th></th>
                             <th></th>
-                            <th></th>
+                            <th>
+                                <select id="sunat-filter" class="form-select form-select-sm text-center px-1">
+                                    <option value="">Todos</option>
+                                    <option value="pendiente">Pendiente</option>
+                                    <option value="enviado">Enviado</option>
+                                    <option value="aceptado">Aceptado</option>
+                                    <option value="rechazado">Rechazado</option>
+                                    <option value="error_comunicacion">Error com.</option>
+                                </select>
+                            </th>
+                            <th>
+                                <select id="whatsapp-filter" class="form-select form-select-sm text-center px-1">
+                                    <option value="">Todos</option>
+                                    <option value="enviado">Enviado</option>
+                                    <option value="pendiente">Pendiente</option>
+                                    <option value="fallido">Fallido</option>
+                                    <option value="sin_telefono">Sin telf.</option>
+                                </select>
+                            </th>
                             <th></th>
                             <th></th>
                         </tr>
