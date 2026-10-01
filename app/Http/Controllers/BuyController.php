@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\StockProduct;
 use App\Models\TypeDocument;
 use App\Models\Warehouse;
+use App\Services\Inventory\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,6 +23,10 @@ use Luecano\NumeroALetras\NumeroALetras;
 
 class BuyController extends Controller
 {
+    public function __construct(
+        protected StockService $stockService
+    ) {}
+
     public function index()
     {
         return view('admin.buys.list');
@@ -43,38 +48,38 @@ class BuyController extends Controller
             ->when($request->filled('filter_voucher'), function ($query) use ($request) {
                 $search = trim((string) $request->input('filter_voucher'));
                 $query->where(function ($subQuery) use ($search) {
-                    $subQuery->where('buys.serie', 'like', '%' . $search . '%')
-                        ->orWhere('buys.correlativo', 'like', '%' . $search . '%')
-                        ->orWhereRaw("CONCAT(buys.serie, '-', buys.correlativo) like ?", ['%' . $search . '%']);
+                    $subQuery->where('buys.serie', 'like', '%'.$search.'%')
+                        ->orWhere('buys.correlativo', 'like', '%'.$search.'%')
+                        ->orWhereRaw("CONCAT(buys.serie, '-', buys.correlativo) like ?", ['%'.$search.'%']);
                 });
             })
             ->when($request->filled('filter_date'), function ($query) use ($request) {
                 $query->whereDate('buys.fecha_emision', $request->input('filter_date'));
             })
             ->when($request->filled('filter_document'), function ($query) use ($request) {
-                $query->where('clients.nro_documento', 'like', '%' . trim((string) $request->input('filter_document')) . '%');
+                $query->where('clients.nro_documento', 'like', '%'.trim((string) $request->input('filter_document')).'%');
             })
             ->when($request->filled('filter_reason'), function ($query) use ($request) {
-                $query->where('clients.nombres', 'like', '%' . trim((string) $request->input('filter_reason')) . '%');
+                $query->where('clients.nombres', 'like', '%'.trim((string) $request->input('filter_reason')).'%');
             })
             ->when($request->filled('filter_total'), function ($query) use ($request) {
-                $query->where('buys.total', 'like', '%' . trim((string) $request->input('filter_total')) . '%');
+                $query->where('buys.total', 'like', '%'.trim((string) $request->input('filter_total')).'%');
             })
             ->orderByDesc('buys.id');
 
         return datatables()
             ->of($buys)
             ->editColumn('documento', function ($buy) {
-                return '<div><div class="fw-semibold">' . e((string) $buy->documento) . '</div><div class="small text-muted mt-1">' . e((string) ($buy->tipo_comprobante ?: 'Compra')) . '</div></div>';
+                return '<div><div class="fw-semibold">'.e((string) $buy->documento).'</div><div class="small text-muted mt-1">'.e((string) ($buy->tipo_comprobante ?: 'Compra')).'</div></div>';
             })
             ->editColumn('fecha_emision', function ($buy) {
                 return date('d/m/Y', strtotime((string) $buy->fecha_emision));
             })
             ->addColumn('proveedor_info', function ($buy) {
-                return '<div><div class="fw-semibold">' . e((string) $buy->proveedor) . '</div><div class="small text-muted mt-1">' . e((string) ($buy->nro_documento ?: 'Sin documento')) . '</div></div>';
+                return '<div><div class="fw-semibold">'.e((string) $buy->proveedor).'</div><div class="small text-muted mt-1">'.e((string) ($buy->nro_documento ?: 'Sin documento')).'</div></div>';
             })
             ->editColumn('total', function ($buy) {
-                return '<span class="fw-semibold">' . e($this->signo_pais() . number_format((float) $buy->total, 2, '.', '')) . '</span>';
+                return '<span class="fw-semibold">'.e($this->signo_pais().number_format((float) $buy->total, 2, '.', '')).'</span>';
             })
             ->addColumn('estado_compra', function ($buy) {
                 return (int) $buy->estado === 1
@@ -83,16 +88,17 @@ class BuyController extends Controller
             })
             ->addColumn('acciones', function ($buy) {
                 $id = $buy->id;
+
                 return '<div class="dropdown">
                             <a href="#" role="button" id="dropdownMenuLink1" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 18H9V20H2V18ZM2 11H11V13H2V11ZM2 4H22V6H2V4ZM20.674 13.0251L21.8301 12.634L22.8301 14.366L21.914 15.1711C21.9704 15.4386 22 15.7158 22 16C22 16.2842 21.9704 16.5614 21.914 16.8289L22.8301 17.634L21.8301 19.366L20.674 18.9749C20.2635 19.3441 19.7763 19.6295 19.2391 19.8044L19 21H17L16.7609 19.8044C16.2237 19.6295 15.7365 19.3441 15.326 18.9749L14.1699 19.366L13.1699 17.634L14.086 16.8289C14.0296 16.5614 14 16.2842 14 16C14 15.7158 14.0296 15.4386 14.086 15.1711L13.1699 14.366L14.1699 12.634L15.326 13.0251C15.7365 12.6559 16.2237 12.3705 16.7609 12.1956L17 11H19L19.2391 12.1956C19.7763 12.3705 20.2635 12.6559 20.674 13.0251ZM18 18C19.1046 18 20 17.1046 20 16C20 14.8954 19.1046 14 18 14C16.8954 14 16 14.8954 16 16C16 17.1046 16.8954 18 18 18Z"></path></svg>
                             </a>
                             <div class="dropdown-menu" aria-labelledby="dropdownMenuLink1">
-                                <a class="dropdown-item btn-pdf" data-id="' . $id . '" href="javascript:void(0);">
+                                <a class="dropdown-item btn-pdf" data-id="'.$id.'" href="javascript:void(0);">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" class="menu-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M5 4H15V8H19V20H5V4ZM3.9985 2C3.44749 2 3 2.44405 3 2.9918V21.0082C3 21.5447 3.44476 22 3.9934 22H20.0066C20.5551 22 21 21.5489 21 20.9925L20.9997 7L16 2H3.9985ZM10.4999 7.5C10.4999 9.07749 10.0442 10.9373 9.27493 12.6534C8.50287 14.3757 7.46143 15.8502 6.37524 16.7191L7.55464 18.3321C10.4821 16.3804 13.7233 15.0421 16.8585 15.49L17.3162 13.5513C14.6435 12.6604 12.4999 9.98994 12.4999 7.5H10.4999ZM11.0999 13.4716C11.3673 12.8752 11.6042 12.2563 11.8037 11.6285C12.2753 12.3531 12.8553 13.0182 13.5101 13.5953C12.5283 13.7711 11.5665 14.0596 10.6352 14.4276C10.7999 14.1143 10.9551 13.7948 11.0999 13.4716Z"></path></svg>
                                     <span> PDF</span>
                                 </a>
-                                <a class="dropdown-item btn-confirm" data-id="' . $id . '" href="javascript:void(0);">
+                                <a class="dropdown-item btn-confirm" data-id="'.$id.'" href="javascript:void(0);">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-trash-2 menu-icon"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                                     <span> Eliminar</span>
                                 </a>
@@ -105,12 +111,12 @@ class BuyController extends Controller
 
     public function save(Request $request)
     {
-        if (! $request->ajax()) {
+        if (! $request->ajax() && ! $request->wantsJson()) {
             return response()->json([
                 'status' => false,
                 'msg' => 'Intente de nuevo',
                 'type' => 'warning',
-            ]);
+            ], 400);
         }
 
         $validator = Validator::make($request->all(), [
@@ -145,17 +151,9 @@ class BuyController extends Controller
         $data = $validator->validated();
         $serie = mb_strtoupper(trim((string) $data['serie']));
         $correlativo = trim((string) $data['correlativo']);
-        $cart = $this->create_cart();
-
-        if (empty($cart['products'])) {
-            return response()->json([
-                'status' => false,
-                'msg' => 'Ingrese al menos 1 producto',
-                'type' => 'warning',
-            ], 422);
-        }
 
         $validBuy = Buy::where('idproveedor', $data['dni_ruc'])
+            ->where('idtipo_comprobante', $data['idtipo_comprobante'])
             ->where('serie', $serie)
             ->where('correlativo', $correlativo)
             ->first();
@@ -163,7 +161,17 @@ class BuyController extends Controller
         if (! empty($validBuy)) {
             return response()->json([
                 'status' => false,
-                'msg' => 'Registro existente con esos datos',
+                'msg' => 'Registro existente con ese proveedor, tipo de comprobante, serie y correlativo.',
+                'type' => 'warning',
+            ], 422);
+        }
+
+        $cart = $this->create_cart();
+
+        if (empty($cart['products'])) {
+            return response()->json([
+                'status' => false,
+                'msg' => 'Ingrese al menos 1 producto',
                 'type' => 'warning',
             ], 422);
         }
@@ -203,20 +211,14 @@ class BuyController extends Controller
                     'idalmacen' => $product['idalmacen'],
                 ]);
 
-                $registro = StockProduct::where('idproducto', $product['id'])
-                    ->where('idalmacen', $product['idalmacen'])
-                    ->first();
-
-                if (! $registro) {
-                    throw new \RuntimeException('Uno de los productos ya no está registrado en el almacén seleccionado.');
-                }
-
-                StockProduct::where('idalmacen', $product['idalmacen'])
-                    ->where('idproducto', $product['id'])
-                    ->update([
-                        'precio_compra' => $product['precio_compra'],
-                        'stock_actual' => ((int) $registro->stock_actual) + ((int) $product['cantidad']),
-                    ]);
+                $this->stockService->recordPurchase(
+                    productId: (int) $product['id'],
+                    warehouseId: (int) $product['idalmacen'],
+                    quantity: (float) $product['cantidad'],
+                    purchaseCost: (float) $product['precio_compra'],
+                    documentNumber: $serie.'-'.$correlativo,
+                    userId: (int) (Auth::id() ?? 1)
+                );
             }
 
             Session::flash('exito', [
@@ -399,35 +401,35 @@ class BuyController extends Controller
             foreach ($cart['products'] as $product) {
                 $contador++;
                 $html_cart .= '<tr>
-                                <td class="text-center">' . $contador . '</td>
-                                <td>' . e((string) $product['descripcion']) . '</td>
-                                <td class="text-center">' . e((string) $product['unidad']) . '</td>
+                                <td class="text-center">'.$contador.'</td>
+                                <td>'.e((string) $product['descripcion']).'</td>
+                                <td class="text-center">'.e((string) $product['unidad']).'</td>
                                 <td class="text-right">
                                     <div class="input-group input-group-sm">
-                                        <span class="input-group-text btn-down" style="cursor: pointer;" data-cart-key="' . e((string) $product['cart_key']) . '" data-cantidad="' . $product['cantidad'] . '" data-precio_compra="' . $product['precio_compra'] . '"><i class="ri-subtract-line me-sm-1"></i></span>
-                                        <input type="text" data-cart-key="' . e((string) $product['cart_key']) . '" class="quantity-counter text-center form-control input-quantity" value="' . $product['cantidad'] . '" data-precio_compra="' . $product['precio_compra'] . '">
-                                        <span class="input-group-text btn-up" style="cursor: pointer;" data-cart-key="' . e((string) $product['cart_key']) . '" data-cantidad="' . $product['cantidad'] . '" data-precio_compra="' . $product['precio_compra'] . '"><i class="ri-add-line me-sm-1"></i></span>
+                                        <span class="input-group-text btn-down" style="cursor: pointer;" data-cart-key="'.e((string) $product['cart_key']).'" data-cantidad="'.$product['cantidad'].'" data-precio_compra="'.$product['precio_compra'].'"><i class="ri-subtract-line me-sm-1"></i></span>
+                                        <input type="text" data-cart-key="'.e((string) $product['cart_key']).'" class="quantity-counter text-center form-control input-quantity" value="'.$product['cantidad'].'" data-precio_compra="'.$product['precio_compra'].'">
+                                        <span class="input-group-text btn-up" style="cursor: pointer;" data-cart-key="'.e((string) $product['cart_key']).'" data-cantidad="'.$product['cantidad'].'" data-precio_compra="'.$product['precio_compra'].'"><i class="ri-add-line me-sm-1"></i></span>
                                     </div>
                                 </td>
-                                <td class="text-center"><input type="text" class="form-control form-control-sm text-center input-precio-compra" value="' . number_format((float) $product['precio_compra'], 2, '.', '') . '" data-cantidad="' . $product['cantidad'] . '" data-cart-key="' . e((string) $product['cart_key']) . '" name="precio_compra"></td>
-                                <td class="text-center">' . number_format(((float) $product['precio_compra'] * (float) $product['cantidad']), 2, '.', '') . '</td>
-                                <td class="text-center"><span data-cart-key="' . e((string) $product['cart_key']) . '" class="text-danger btn-delete-product" style="cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x align-middle mr-25"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span></td>
+                                <td class="text-center"><input type="text" class="form-control form-control-sm text-center input-precio-compra" value="'.number_format((float) $product['precio_compra'], 2, '.', '').'" data-cantidad="'.$product['cantidad'].'" data-cart-key="'.e((string) $product['cart_key']).'" name="precio_compra"></td>
+                                <td class="text-center">'.number_format(((float) $product['precio_compra'] * (float) $product['cantidad']), 2, '.', '').'</td>
+                                <td class="text-center"><span data-cart-key="'.e((string) $product['cart_key']).'" class="text-danger btn-delete-product" style="cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x align-middle mr-25"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span></td>
                             </tr>';
             }
         }
 
         $html_totales .= '<div class="d-flex justify-content-between mb-2">
                                 <span style="width: 130px !important;">OP. Gravadas:</span>
-                                <span class="fw-medium">' . $signo . number_format((float) $cart['subtotal'], 2, '.', '') . '</span>
+                                <span class="fw-medium">'.$signo.number_format((float) $cart['subtotal'], 2, '.', '').'</span>
                             </div>
                             <div class="d-flex justify-content-between mb-2">
                                 <span style="width: 130px !important;">IGV:</span>
-                                <span class="fw-medium">' . $signo . number_format((float) $cart['igv'], 2, '.', '') . '</span>
+                                <span class="fw-medium">'.$signo.number_format((float) $cart['igv'], 2, '.', '').'</span>
                             </div>
                             <hr>
                             <div class="d-flex justify-content-between">
                                 <span style="width: 130px !important;">Total:</span>
-                                <span class="fw-medium">' . $signo . number_format((float) $cart['total'], 2, '.', '') . '</span>
+                                <span class="fw-medium">'.$signo.number_format((float) $cart['total'], 2, '.', '').'</span>
                             </div>';
 
         return response()->json([
@@ -524,9 +526,9 @@ class BuyController extends Controller
         $data['signo'] = $this->signo_pais();
         $data['business'] = Business::where('id', 1)->first();
         $data['provider'] = Client::where('id', $data['buy']['idproveedor'])->first();
-        $data['name_buy'] = mb_strtoupper($data['provider']->nro_documento . '-' . $data['buy']['serie']) . '-' . $data['buy']['correlativo'];
+        $data['name_buy'] = mb_strtoupper($data['provider']->nro_documento.'-'.$data['buy']['serie']).'-'.$data['buy']['correlativo'];
         $data['type_document'] = TypeDocument::where('id', $data['buy']['idtipo_comprobante'])->first();
-        $formatter = new NumeroALetras();
+        $formatter = new NumeroALetras;
         $data['numero_letras'] = $formatter->toWords($data['buy']->total, 2);
         $data['detail'] = DetailBuy::select(
             'detail_buys.*',
@@ -545,20 +547,22 @@ class BuyController extends Controller
 
         return response()->json([
             'status' => true,
-            'pdf' => $data['name_buy'] . '.pdf',
+            'pdf' => $data['name_buy'].'.pdf',
         ]);
     }
 
     public function test_pdf()
     {
         $pdf = PDF::loadView('admin.buys.test_pdf')->setPaper('A4', 'portrait');
+
         return $pdf->stream();
     }
 
     public function gen_pdf($data, $name)
     {
         $pdf = PDF::loadView('admin.buys.pdf', $data)->setPaper('A4', 'portrait');
-        return $pdf->save(public_path('files/buys/' . $name . '.pdf'));
+
+        return $pdf->save(public_path('files/buys/'.$name.'.pdf'));
     }
 
     public function delete(Request $request)
@@ -589,25 +593,15 @@ class BuyController extends Controller
 
         DB::transaction(function () use ($detailBuy, $id) {
             foreach ($detailBuy as $item) {
-                $idProduct = (int) $item['idproducto'];
-                $cantidad = (int) $item['cantidad'];
-                $registro = StockProduct::where('idproducto', $idProduct)
-                    ->where('idalmacen', $item['idalmacen'])
-                    ->first();
-
-                if (! $registro) {
-                    continue;
-                }
-
-                $nuevoStock = ((int) $registro->stock_actual - $cantidad) <= 0
-                    ? 0
-                    : ((int) $registro->stock_actual - $cantidad);
-
-                StockProduct::where('idproducto', $idProduct)
-                    ->where('idalmacen', $item['idalmacen'])
-                    ->update([
-                        'stock_actual' => $nuevoStock,
-                    ]);
+                $this->stockService->decreaseStock(
+                    productId: (int) $item['idproducto'],
+                    warehouseId: (int) $item['idalmacen'],
+                    quantity: (float) $item['cantidad'],
+                    movementType: 'anulacion_compra',
+                    documentType: '00',
+                    documentNumber: 'COMPRA-'.$id,
+                    userId: (int) (Auth::id() ?? 1)
+                );
             }
 
             DetailBuy::where('idcompra', $id)->delete();
@@ -637,6 +631,7 @@ class BuyController extends Controller
             ];
 
             session($buy);
+
             return session()->get('buy');
         }
 
@@ -655,7 +650,7 @@ class BuyController extends Controller
             $igvProducto = ((float) $product['precio_compra'] - $precioBase) * (int) $product['cantidad'];
             $igv += $this->redondeado($igvProducto);
             $subtotal += $precioBase * (int) $product['cantidad'];
-            session()->put('buy.products.' . $index, $product);
+            session()->put('buy.products.'.$index, $product);
         }
 
         $total = $subtotal + $igv;
@@ -670,6 +665,7 @@ class BuyController extends Controller
         ];
 
         session($buy);
+
         return session()->get('buy');
     }
 
@@ -696,7 +692,7 @@ class BuyController extends Controller
 
         $newProduct = [
             'id' => $product->id,
-            'cart_key' => $id . '-' . $idalmacen,
+            'cart_key' => $id.'-'.$idalmacen,
             'codigo_sunat' => $product->codigo_sunat,
             'descripcion' => $product->descripcion,
             'idunidad' => $product->idunidad,
@@ -712,6 +708,7 @@ class BuyController extends Controller
 
         if (empty(session()->get('buy')['products'])) {
             session()->push('buy.products', $newProduct);
+
             return true;
         }
 
@@ -719,12 +716,14 @@ class BuyController extends Controller
             if (($newProduct['cart_key']) === ($sessionProduct['cart_key'] ?? null)) {
                 $sessionProduct['cantidad'] = $sessionProduct['cantidad'] + $cantidad;
                 $sessionProduct['precio_compra'] = $precio_compra;
-                session()->put('buy.products.' . $index, $sessionProduct);
+                session()->put('buy.products.'.$index, $sessionProduct);
+
                 return true;
             }
         }
 
         session()->push('buy.products', $newProduct);
+
         return true;
     }
 
@@ -736,7 +735,8 @@ class BuyController extends Controller
 
         foreach (session()->get('buy')['products'] as $index => $product) {
             if ($cartKey === ($product['cart_key'] ?? null)) {
-                session()->forget('buy.products.' . $index);
+                session()->forget('buy.products.'.$index);
+
                 return true;
             }
         }
@@ -754,7 +754,8 @@ class BuyController extends Controller
             if ($cartKey === ($product['cart_key'] ?? null)) {
                 $product['cantidad'] = $cantidad;
                 $product['precio_compra'] = $precio_compra;
-                session()->put('buy.products.' . $index, $product);
+                session()->put('buy.products.'.$index, $product);
+
                 return true;
             }
         }
@@ -769,6 +770,7 @@ class BuyController extends Controller
         }
 
         session()->forget('buy');
+
         return true;
     }
 

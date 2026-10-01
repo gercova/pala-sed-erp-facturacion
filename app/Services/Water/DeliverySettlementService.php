@@ -19,8 +19,8 @@ use App\Models\PayMode;
 use App\Models\Product;
 use App\Models\SaleNote;
 use App\Models\Serie;
-use App\Models\StockProduct;
 use App\Models\User;
+use App\Services\Inventory\StockService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -67,7 +67,8 @@ class DeliverySettlementService
         protected JugMovementService $jugService,
         protected LoyaltyService $loyaltyService,
         protected DeliveryDocumentResolverService $documentResolver,
-        protected WhatsAppSenderService $whatsappSender
+        protected WhatsAppSenderService $whatsappSender,
+        protected StockService $stockService
     ) {}
 
     /**
@@ -171,7 +172,6 @@ class DeliverySettlementService
             }
 
             $client = Client::findOrFail($lockedOrder->idcliente);
-
             $intact = (int) ($data['bidones_vacios_recibidos'] ?? 0);
             $damaged = (int) ($data['bidones_danados_recibidos'] ?? 0);
             $damageCost = (float) ($data['cobro_envases_danados'] ?? 0);
@@ -252,16 +252,14 @@ class DeliverySettlementService
             // Invariante B1: Descuento de stock en almacén para productos físicos inventariables
             foreach ($lockedOrder->items as $item) {
                 if ($item->idproducto) {
-                    $stockProduct = StockProduct::where('idproducto', $item->idproducto)
-                        ->where('idalmacen', $idalmacen)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($stockProduct) {
-                        $stockProduct->update([
-                            'stock_actual' => max(0, (int) $stockProduct->stock_actual - (int) $item->cantidad),
-                        ]);
-                    }
+                    $this->stockService->decreaseStock(
+                        (int) $item->idproducto,
+                        $idalmacen,
+                        (float) $item->cantidad,
+                        'entrega_delivery',
+                        'Pedido Delivery',
+                        $lockedOrder->codigo_orden
+                    );
                 }
             }
 

@@ -22,9 +22,13 @@ use App\Models\TypeDocument;
 use App\Models\Warehouse;
 use App\Services\Ebilling\Payload\BillingPayloadBuilder;
 use App\Services\Ebilling\SunatDispatchService;
+use App\Services\Inventory\StockService;
 use App\Services\Water\LoyaltyService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -36,10 +40,11 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 class PosController extends Controller
 {
     public function __construct(
-        protected LoyaltyService $loyaltyService
+        protected LoyaltyService $loyaltyService,
+        protected StockService $stockService
     ) {}
 
-    public function index()
+    public function index(): View
     {
         $billingSummary = $this->billingsByCurrentWarehouse()
             ->join('type_documents', 'billings.idtipo_comprobante', '=', 'type_documents.id')
@@ -58,7 +63,7 @@ class PosController extends Controller
         ]);
     }
 
-    public function create(Request $request)
+    public function create(Request $request): View|RedirectResponse
     {
         $data['signo'] = $this->signo_pais();
         $data['typeDocuments'] = IdentityDocumentType::query()
@@ -96,7 +101,7 @@ class PosController extends Controller
         return view('admin.pos.home', $data);
     }
 
-    public function get()
+    public function get(): JsonResponse
     {
         $billingDocuments = $this->billingsByCurrentWarehouse()
             ->selectRaw("
@@ -214,7 +219,7 @@ class PosController extends Controller
             ->toJson();
     }
 
-    public function load_cart(Request $request)
+    public function load_cart(Request $request): JsonResponse
     {
         if (! $request->ajax()) {
             return response()->json([
@@ -302,7 +307,7 @@ class PosController extends Controller
         ]);
     }
 
-    public function search_product(Request $request)
+    public function search_product(Request $request): JsonResponse
     {
         if (! $request->ajax()) {
             return response()->json([
@@ -860,19 +865,14 @@ class PosController extends Controller
                 }
 
                 foreach ($cart['products'] as $product) {
-                    if ((int) $product['opcion'] !== 1) {
-                        continue;
-                    }
-
-                    $registro = StockProduct::where('idproducto', $product['id'])
-                        ->where('idalmacen', $product['idalmacen'])
-                        ->lockForUpdate()
-                        ->first();
-
-                    $nuevoStock = max(0, (int) $registro->stock_actual - (int) $product['cantidad']);
-                    $registro->update([
-                        'stock_actual' => $nuevoStock,
-                    ]);
+                    $this->stockService->decreaseStock(
+                        (int) $product['id'],
+                        (int) $product['idalmacen'],
+                        (float) $product['cantidad'],
+                        'venta_pos',
+                        $documentType->descripcion ?? 'POS',
+                        $serieModel->serie.'-'.$formattedCorrelative
+                    );
                 }
 
                 foreach ($paymentBreakdown as $payment) {
@@ -1248,19 +1248,14 @@ class PosController extends Controller
                 }
 
                 foreach ($cart['products'] as $product) {
-                    if ((int) $product['opcion'] !== 1) {
-                        continue;
-                    }
-
-                    $registro = StockProduct::where('idproducto', $product['id'])
-                        ->where('idalmacen', $product['idalmacen'])
-                        ->lockForUpdate()
-                        ->first();
-
-                    $nuevoStock = max(0, (int) $registro->stock_actual - (int) $product['cantidad']);
-                    $registro->update([
-                        'stock_actual' => $nuevoStock,
-                    ]);
+                    $this->stockService->decreaseStock(
+                        (int) $product['id'],
+                        (int) $product['idalmacen'],
+                        (float) $product['cantidad'],
+                        'venta_pos',
+                        $documentType->descripcion ?? 'POS',
+                        $serieModel->serie.'-'.$formattedCorrelative
+                    );
                 }
 
                 if ($paymentCondition === 'contado') {

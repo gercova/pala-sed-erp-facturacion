@@ -97,6 +97,7 @@ class KardexController extends Controller
             $this->billingMovementsQuery($warehouseId, $productId),
             $this->transferOutMovementsQuery($warehouseId, $productId),
             $this->transferInMovementsQuery($warehouseId, $productId),
+            $this->adjustmentMovementsQuery($warehouseId, $productId),
         ];
 
         $union = array_shift($queries);
@@ -282,5 +283,28 @@ class KardexController extends Controller
             ->where('transfer_orders.estado', 1)
             ->when($warehouseId > 0, fn ($query) => $query->where('transfer_orders.idalmacen_receptor', $warehouseId))
             ->when($productId > 0, fn ($query) => $query->where('detail_transfer_orders.idproducto', $productId));
+    }
+
+    private function adjustmentMovementsQuery(int $warehouseId, int $productId)
+    {
+        return DB::table('inventory_adjustments')
+            ->selectRaw("
+                inventory_adjustments.id as row_id,
+                DATE(inventory_adjustments.created_at) as fecha,
+                'inventory_adjustment' as movement_type,
+                'Ajuste de inventario' as movement_label,
+                COALESCE(inventory_adjustments.documento_referencia, CONCAT('AJUSTE #', inventory_adjustments.id)) as documento,
+                inventory_adjustments.idproducto as product_id,
+                products.descripcion as product_name,
+                warehouses.descripcion as warehouse_name,
+                CASE WHEN inventory_adjustments.cantidad_diferencia > 0 THEN inventory_adjustments.cantidad_diferencia ELSE 0 END as entrada,
+                CASE WHEN inventory_adjustments.cantidad_diferencia < 0 THEN ABS(inventory_adjustments.cantidad_diferencia) ELSE 0 END as salida,
+                inventory_adjustments.costo_unitario as costo_unitario,
+                (ABS(inventory_adjustments.cantidad_diferencia) * COALESCE(inventory_adjustments.costo_unitario, 0)) as total_movimiento
+            ")
+            ->join('products', 'products.id', '=', 'inventory_adjustments.idproducto')
+            ->leftJoin('warehouses', 'warehouses.id', '=', 'inventory_adjustments.idalmacen')
+            ->when($warehouseId > 0, fn ($query) => $query->where('inventory_adjustments.idalmacen', $warehouseId))
+            ->when($productId > 0, fn ($query) => $query->where('inventory_adjustments.idproducto', $productId));
     }
 }

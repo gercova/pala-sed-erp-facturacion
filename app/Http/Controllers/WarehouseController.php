@@ -7,12 +7,17 @@ use App\Imports\ProductsWarehouseImport;
 use App\Models\Product;
 use App\Models\StockProduct;
 use App\Models\Warehouse;
+use App\Services\Inventory\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 
 class WarehouseController extends Controller
 {
+    public function __construct(
+        protected StockService $stockService
+    ) {}
+
     public function index()
     {
         return view('admin.warehouses.list');
@@ -32,33 +37,34 @@ class WarehouseController extends Controller
         return datatables()
             ->of($warehouses)
             ->addColumn('pin_column', function () {
-                return '<img src="' . asset('assets/img/pin_home.png') . '" class="img-fluid" alt="" width="80%">';
+                return '<img src="'.asset('assets/img/pin_home.png').'" class="img-fluid" alt="" width="80%">';
             })
             ->addColumn('descripcion_completa', function (Warehouse $warehouse) {
                 return '<div>
-                            <strong>' . e($warehouse->descripcion) . '</strong><br>
-                            <span class="text-muted" style="font-size: 12px;">' . e($warehouse->direccion ?: 'Sin dirección registrada') . '</span>
+                            <strong>'.e($warehouse->descripcion).'</strong><br>
+                            <span class="text-muted" style="font-size: 12px;">'.e($warehouse->direccion ?: 'Sin dirección registrada').'</span>
                         </div>';
             })
             ->addColumn('acciones', function (Warehouse $warehouse) {
                 $id = $warehouse->id;
+
                 return '<div class="dropdown">
                             <a href="#" role="button" id="dropdownMenuLink1" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 18H9V20H2V18ZM2 11H11V13H2V11ZM2 4H22V6H2V4ZM20.674 13.0251L21.8301 12.634L22.8301 14.366L21.914 15.1711C21.9704 15.4386 22 15.7158 22 16C22 16.2842 21.9704 16.5614 21.914 16.8289L22.8301 17.634L21.8301 19.366L20.674 18.9749C20.2635 19.3441 19.7763 19.6295 19.2391 19.8044L19 21H17L16.7609 19.8044C16.2237 19.6295 15.7365 19.3441 15.326 18.9749L14.1699 19.366L13.1699 17.634L14.086 16.8289C14.0296 16.5614 14 16.2842 14 16C14 15.7158 14.0296 15.4386 14.086 15.1711L13.1699 14.366L14.1699 12.634L15.326 13.0251C15.7365 12.6559 16.2237 12.3705 16.7609 12.1956L17 11H19L19.2391 12.1956C19.7763 12.3705 20.2635 12.6559 20.674 13.0251ZM18 18C19.1046 18 20 17.1046 20 16C20 14.8954 19.1046 14 18 14C16.8954 14 16 14.8954 16 16C16 17.1046 16.8954 18 18 18Z" class="menu-icon"></path></svg>
                             </a>
                             <div class="dropdown-menu" aria-labelledby="dropdownMenuLink1">
-                                <a class="dropdown-item" data-id="' . $id . '" href="' . route('admin.products_warehouse', $id) . '">
+                                <a class="dropdown-item" data-id="'.$id.'" href="'.route('admin.products_warehouse', $id).'">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" width="24" height="24" class="main-grid-item-icon menu-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
                                 <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
                                 <line x1="7" x2="7.01" y1="7" y2="7" />
                                 </svg>
                                 <span> Productos</span>
                             </a>
-                            <a class="dropdown-item btn-detail" data-id="' . $id . '" href="javascript:void(0);">
+                            <a class="dropdown-item btn-detail" data-id="'.$id.'" href="javascript:void(0);">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit menu-icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 <span> Actualizar</span>
                                 </a>
-                                    <a class="dropdown-item btn-confirm" data-id="' . $id . '" href="javascript:void(0);">
+                                    <a class="dropdown-item btn-confirm" data-id="'.$id.'" href="javascript:void(0);">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-trash-2 menu-icon"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                                     <span> Eliminar</span>
                             </a>
@@ -224,6 +230,7 @@ class WarehouseController extends Controller
     public function products($id)
     {
         $data['warehouse'] = Warehouse::query()->findOrFail((int) $id);
+
         return view('admin.warehouses.products.list', $data);
     }
 
@@ -250,28 +257,29 @@ class WarehouseController extends Controller
             ->where('stock_products.idalmacen', $id);
 
         if ($request->has('barcode') && $request->barcode != '') {
-            $query->where('products.codigo_barras', 'like', '%' . $request->barcode . '%');
+            $query->where('products.codigo_barras', 'like', '%'.$request->barcode.'%');
         }
         if ($request->has('code_intern') && $request->code_intern != '') {
-            $query->where('products.codigo_interno', 'like', '%' . $request->code_intern . '%');
+            $query->where('products.codigo_interno', 'like', '%'.$request->code_intern.'%');
         }
         if ($request->has('description') && $request->description != '') {
-            $query->where('products.descripcion', 'like', '%' . $request->description . '%');
+            $query->where('products.descripcion', 'like', '%'.$request->description.'%');
         }
         if ($request->has('price_buy') && $request->price_buy != '') {
-            $query->where('stock_products.precio_compra', 'like', '%' . $request->price_buy . '%');
+            $query->where('stock_products.precio_compra', 'like', '%'.$request->price_buy.'%');
         }
         if ($request->has('price_sale') && $request->price_sale != '') {
-            $query->where('stock_products.precio_venta', 'like', '%' . $request->price_sale . '%');
+            $query->where('stock_products.precio_venta', 'like', '%'.$request->price_sale.'%');
         }
         if ($request->has('stock_min') && $request->stock_min != '') {
-            $query->where('stock_products.stock_minimo', 'like', '%' . $request->stock_min . '%');
+            $query->where('stock_products.stock_minimo', 'like', '%'.$request->stock_min.'%');
         }
         if ($request->has('stock_act') && $request->stock_act != '') {
-            $query->where('stock_products.stock_actual', 'like', '%' . $request->stock_act . '%');
+            $query->where('stock_products.stock_actual', 'like', '%'.$request->stock_act.'%');
         }
 
         $productos = $query->orderByDesc('stock_products.created_at')->get();
+
         return datatables()
             ->of($productos)
             ->editColumn('producto', function ($producto) {
@@ -279,34 +287,35 @@ class WarehouseController extends Controller
                     ? '<span class="badge bg-info-subtle text-info fw-medium ms-2">Servicio</span>'
                     : '<span class="badge bg-success-subtle text-success fw-medium ms-2">Producto</span>';
 
-                return '<div><div class="fw-semibold">' . e($producto->producto) . '</div><div class="small text-muted mt-1">' . $typeBadge . '</div></div>';
+                return '<div><div class="fw-semibold">'.e($producto->producto).'</div><div class="small text-muted mt-1">'.$typeBadge.'</div></div>';
             })
             ->addColumn('precio_compra', function ($producto) {
                 return '<input type="text" class="align-middle form-control form-control-sm text-center input-precio-compra" 
-                            name="input-precio-compra" value="' . number_format((float) $producto->precio_compra, 2, '.', '') . '" 
-                            data-idalmacen="' . $producto->idalmacen . '" 
-                            data-idproducto="' . $producto->idproducto . '" 
-                            data-stock_minimo="' . $producto->stock_minimo . '" 
-                            data-precio_venta="' . $producto->precio_venta . '"
+                            name="input-precio-compra" value="'.number_format((float) $producto->precio_compra, 2, '.', '').'" 
+                            data-idalmacen="'.$producto->idalmacen.'" 
+                            data-idproducto="'.$producto->idproducto.'" 
+                            data-stock_minimo="'.$producto->stock_minimo.'" 
+                            data-precio_venta="'.$producto->precio_venta.'"
                             >';
             })
             ->addColumn('precio_venta', function ($producto) {
                 return '<input type="text" class="align-middle form-control form-control-sm text-center input-precio-venta" 
-                            name="input-precio-venta" value="' . number_format((float) $producto->precio_venta, 2, '.', '') . '" 
-                            data-idalmacen="' . $producto->idalmacen . '" 
-                            data-idproducto="' . $producto->idproducto . '" 
-                            data-stock_minimo="' . $producto->stock_minimo . '" 
-                            data-precio_compra="' . $producto->precio_compra . '">';
+                            name="input-precio-venta" value="'.number_format((float) $producto->precio_venta, 2, '.', '').'" 
+                            data-idalmacen="'.$producto->idalmacen.'" 
+                            data-idproducto="'.$producto->idproducto.'" 
+                            data-stock_minimo="'.$producto->stock_minimo.'" 
+                            data-precio_compra="'.$producto->precio_compra.'">';
             })
             ->addColumn('stock_minimo', function ($producto) {
                 if ($producto->opcion == 1) {
                     return '<input type="text" class="align-middle form-control form-control-sm text-center input-stock-minimo" 
-                        name="input-stock-minimo" value="' . (int) $producto->stock_minimo . '" 
-                        data-idalmacen="' . $producto->idalmacen . '" 
-                        data-idproducto="' . $producto->idproducto . '" 
-                        data-precio_compra="' . $producto->precio_compra . '" 
-                        data-precio_venta="' . $producto->precio_venta . '">';
+                        name="input-stock-minimo" value="'.(int) $producto->stock_minimo.'" 
+                        data-idalmacen="'.$producto->idalmacen.'" 
+                        data-idproducto="'.$producto->idproducto.'" 
+                        data-precio_compra="'.$producto->precio_compra.'" 
+                        data-precio_venta="'.$producto->precio_venta.'">';
                 }
+
                 return '<span class="badge bg-light text-muted border">No aplica</span>';
             })
             ->editColumn('stock_actual', function ($producto) {
@@ -327,10 +336,11 @@ class WarehouseController extends Controller
                     $label = 'Stock bajo';
                 }
 
-                return '<div class="text-center"><div class="fw-semibold">' . $stockActual . '</div><div class="mt-1"><span class="badge ' . $badgeClass . '">' . $label . '</span></div></div>';
+                return '<div class="text-center"><div class="fw-semibold">'.$stockActual.'</div><div class="mt-1"><span class="badge '.$badgeClass.'">'.$label.'</span></div></div>';
             })
             ->addColumn('acciones', function ($producto) {
                 $hidden = ($producto->opcion == 1) ? '' : 'd-none';
+
                 return '<div class="dropdown">
                             <a href="#" role="button" id="dropdownMenuLink1" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -338,20 +348,20 @@ class WarehouseController extends Controller
                                 </svg>
                             </a>
                             <div class="dropdown-menu" aria-labelledby="dropdownMenuLink1">
-                                <a class="dropdown-item btn-detail-sum ' . $hidden . '" data-idalmacen="' . $producto->idalmacen . '" data-idproducto="' . $producto->idproducto . '" href="javascript:void(0);">
+                                <a class="dropdown-item btn-detail-sum '.$hidden.'" data-idalmacen="'.$producto->idalmacen.'" data-idproducto="'.$producto->idproducto.'" href="javascript:void(0);">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus mr-50 menu-icon">
                                     <line x1="12" y1="5" x2="12" y2="19"></line>
                                     <line x1="5" y1="12" x2="19" y2="12"></line>
                                 </svg>
                                 <span> Sumar</span>
                             </a>
-                            <a class="dropdown-item btn-detail-stock ' . $hidden . '" data-idalmacen="' . $producto->idalmacen . '" data-idproducto="' . $producto->idproducto . '" href="javascript:void(0);">
+                            <a class="dropdown-item btn-detail-stock '.$hidden.'" data-idalmacen="'.$producto->idalmacen.'" data-idproducto="'.$producto->idproducto.'" href="javascript:void(0);">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit-2 mr-50 menu-icon">
                                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                                 </svg>
                                 <span> Actualizar</span>
                             </a>
-                            <a class="dropdown-item btn-confirm-stock" data-idalmacen="' . $producto->idalmacen . '" data-idproducto="' . $producto->idproducto . '" href="javascript:void(0);">
+                            <a class="dropdown-item btn-confirm-stock" data-idalmacen="'.$producto->idalmacen.'" data-idproducto="'.$producto->idproducto.'" href="javascript:void(0);">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-trash mr-50 menu-icon">
                                     <polyline points="3 6 5 6 21 6"></polyline>
                                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -382,20 +392,20 @@ class WarehouseController extends Controller
             ->join('categories', 'products.idcategoria', 'categories.id');
 
         if ($request->has('search_barcode') && $request->search_barcode) {
-            $productos->where('products.codigo_barras', 'LIKE', '%' . $request->search_barcode . '%');
+            $productos->where('products.codigo_barras', 'LIKE', '%'.$request->search_barcode.'%');
         }
 
         if ($request->has('search_code_intern') && $request->search_code_intern) {
-            $productos->where('products.codigo_interno', 'LIKE', '%' . $request->search_code_intern . '%');
+            $productos->where('products.codigo_interno', 'LIKE', '%'.$request->search_code_intern.'%');
         }
 
         if ($request->has('search_description') && $request->search_description) {
-            $productos->where('products.descripcion', 'LIKE', '%' . $request->search_description . '%');
+            $productos->where('products.descripcion', 'LIKE', '%'.$request->search_description.'%');
         }
 
         if ($request->has('search_category') && $request->search_category) {
             $productos->whereHas('category', function ($query) use ($request) {
-                $query->where('categories.descripcion', 'LIKE', '%' . $request->search_category . '%');
+                $query->where('categories.descripcion', 'LIKE', '%'.$request->search_category.'%');
             });
         }
 
@@ -408,15 +418,16 @@ class WarehouseController extends Controller
         return datatables()
             ->of($productos)
             ->addColumn('checkbox', function ($producto) {
-                return '<input type="checkbox" class="align-middle checkbox-item btn-checkbox" data-precio_compra="' . $producto->precio_compra . '" data-id="' . $producto->id . '" data-precio_venta="' . $producto->precio_venta . '">';
+                return '<input type="checkbox" class="align-middle checkbox-item btn-checkbox" data-precio_compra="'.$producto->precio_compra.'" data-id="'.$producto->id.'" data-precio_venta="'.$producto->precio_venta.'">';
             })
             ->addColumn('stock_inicial', function ($producto) {
                 $tipo = ($producto->opcion == 1) ? 'producto' : 'servicio';
                 $hidden = ($producto->opcion == 1) ? 'text' : 'hidden';
-                return '<input type="' . $hidden . '" class="align-middle form-control form-control-sm" 
-                name="input-stock" data-id="' . $producto->id . '" disabled 
-                data-tipo="' . $tipo . '" data-precio_compra="' . $producto->precio_compra . '" 
-                data-precio_venta="' . $producto->precio_venta . '" 
+
+                return '<input type="'.$hidden.'" class="align-middle form-control form-control-sm" 
+                name="input-stock" data-id="'.$producto->id.'" disabled 
+                data-tipo="'.$tipo.'" data-precio_compra="'.$producto->precio_compra.'" 
+                data-precio_venta="'.$producto->precio_venta.'" 
                 onkeydown="return event.key !== \'Enter\';">';
             })
             ->rawColumns(['checkbox', 'stock_inicial'])
@@ -546,15 +557,20 @@ class WarehouseController extends Controller
         if ((int) $producto->opcion === 2) {
             return response()->json([
                 'status' => false,
-                'msg' => 'Los servicios no manejan stock fÃ­sico por almacÃ©n.',
+                'msg' => 'Los servicios no manejan stock físico por almacén.',
                 'type' => 'warning',
             ], 422);
         }
 
-        $stock_db = StockProduct::where('idalmacen', $idalmacen)->where('idproducto', $producto->id)->first();
-        StockProduct::where('idalmacen', $idalmacen)->where('idproducto', $producto->id)->update([
-            'stock_actual' => $stock_db->stock_actual + $cantidad,
-        ]);
+        $this->stockService->increaseStock(
+            productId: (int) $producto->id,
+            warehouseId: (int) $idalmacen,
+            quantity: (float) $cantidad,
+            movementType: 'ajuste_manual',
+            documentType: '00',
+            documentNumber: 'AJUSTE-MANUAL',
+            userId: (int) (auth()->id() ?? 1)
+        );
 
         return response()->json([
             'status' => true,
@@ -695,14 +711,20 @@ class WarehouseController extends Controller
         if ((int) $stock_db->opcion === 2) {
             return response()->json([
                 'status' => false,
-                'msg' => 'Los servicios no manejan stock fÃ­sico.',
+                'msg' => 'Los servicios no manejan stock físico.',
                 'type' => 'warning',
             ], 422);
         }
 
-        StockProduct::where('idalmacen', $idalmacen)->where('idproducto', $idproducto)->update([
-            'stock_actual' => $stock_db->stock_actual + $cantidad,
-        ]);
+        $this->stockService->increaseStock(
+            productId: $idproducto,
+            warehouseId: $idalmacen,
+            quantity: (float) $cantidad,
+            movementType: 'ajuste_manual',
+            documentType: '00',
+            documentNumber: 'AJUSTE-MANUAL',
+            userId: (int) (auth()->id() ?? 1)
+        );
 
         return response()->json([
             'status' => true,
@@ -729,7 +751,7 @@ class WarehouseController extends Controller
         if ((int) $stock->opcion === 2) {
             return response()->json([
                 'status' => false,
-                'msg' => 'Los servicios no manejan stock fÃ­sico.',
+                'msg' => 'Los servicios no manejan stock físico.',
                 'type' => 'warning',
             ], 422);
         }
@@ -769,14 +791,20 @@ class WarehouseController extends Controller
         if ((int) $stock->opcion === 2) {
             return response()->json([
                 'status' => false,
-                'msg' => 'Los servicios no manejan stock fÃ­sico.',
+                'msg' => 'Los servicios no manejan stock físico.',
                 'type' => 'warning',
             ], 422);
         }
 
-        StockProduct::where('idalmacen', $idalmacen)->where('idproducto', $idproducto)->update([
-            'stock_actual' => $stock_actual,
-        ]);
+        $this->stockService->adjustStock(
+            productId: $idproducto,
+            warehouseId: $idalmacen,
+            newStock: (float) $stock_actual,
+            reason: 'Ajuste manual desde módulo de almacén',
+            adjustmentType: 'manual',
+            userId: (int) (auth()->id() ?? 1),
+            referenceDocument: 'AJUSTE-ALMACEN'
+        );
 
         return response()->json([
             'status' => true,
@@ -803,7 +831,7 @@ class WarehouseController extends Controller
         if ((int) $stock->opcion === 1 && (int) $stock->stock_actual > 0) {
             return response()->json([
                 'status' => false,
-                'msg' => 'No se puede retirar el producto mientras tenga stock en el almacÃ©n.',
+                'msg' => 'No se puede retirar el producto mientras tenga stock en el almacén.',
                 'type' => 'warning',
             ], 422);
         }
@@ -811,6 +839,8 @@ class WarehouseController extends Controller
         StockProduct::where('idalmacen', (int) $request->input('idalmacen'))
             ->where('idproducto', (int) $request->input('idproducto'))
             ->delete();
+
+        $this->stockService->syncProductStock((int) $request->input('idproducto'));
 
         return response()->json([
             'status' => true,
@@ -887,7 +917,7 @@ class WarehouseController extends Controller
             ->orderByDesc('stock_products.created_at')
             ->get();
 
-        return Excel::download(new ProductsWarehouseExport($stock_products), 'productos_almacen_' . $id . '.xlsx');
+        return Excel::download(new ProductsWarehouseExport($stock_products), 'productos_almacen_'.$id.'.xlsx');
     }
 
     public function upload_excel_products(Request $request)
@@ -922,6 +952,7 @@ class WarehouseController extends Controller
 
         try {
             Excel::import(new ProductsWarehouseImport($idalmacen), $excel);
+
             return response()->json([
                 'status' => true,
                 'msg' => 'Los datos se actualizaron correctamente',
@@ -930,7 +961,7 @@ class WarehouseController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'msg' => 'Se encontraron observaciones en el documento ' . $e->getMessage(),
+                'msg' => 'Se encontraron observaciones en el documento '.$e->getMessage(),
                 'type' => 'warning',
             ]);
         }

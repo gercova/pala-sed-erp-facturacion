@@ -10,6 +10,7 @@ use App\Models\DeliveryOrder;
 use App\Models\DetailPayment;
 use App\Models\JugMovement;
 use App\Models\SaleNote;
+use App\Models\TypeDocument;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -608,13 +609,32 @@ class ArchingCashController extends Controller
 
     private function buildSummary(ArchingCash $archingCash): array
     {
-        $saleNotesValid = SaleNote::query()->where('idarqueocaja', $archingCash->id)->where('estado', 1);
+        $convertedSaleNoteIds = DB::table('delivery_orders')
+            ->whereNotNull('idnotaventa')
+            ->whereNotNull('idfactura')
+            ->pluck('idnotaventa')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $saleNotesValid = SaleNote::query()
+            ->where('idarqueocaja', $archingCash->id)
+            ->where('estado', 1)
+            ->when(! empty($convertedSaleNoteIds), fn ($q) => $q->whereNotIn('id', $convertedSaleNoteIds));
         $saleNotesAnnulled = SaleNote::query()->where('idarqueocaja', $archingCash->id)->where('estado', 2);
-        $billingsValid = Billing::query()->where('idarqueocaja', $archingCash->id)->where('anulado', false);
-        $billingsAnnulled = Billing::query()->where('idarqueocaja', $archingCash->id)->where('anulado', true);
+
+        $billingsValid = Billing::query()
+            ->leftJoin('type_documents', 'billings.idtipo_comprobante', '=', 'type_documents.id')
+            ->where('billings.idarqueocaja', $archingCash->id)
+            ->where('billings.anulado', false);
+        $billingsAnnulled = Billing::query()->where('billings.idarqueocaja', $archingCash->id)->where('billings.anulado', true);
 
         $salesCount = (clone $saleNotesValid)->count() + (clone $billingsValid)->count();
-        $salesTotal = (float) (clone $saleNotesValid)->sum('total') + (float) (clone $billingsValid)->sum('total');
+        $billingsNetTotal = (float) (clone $billingsValid)
+            ->selectRaw("SUM(CASE WHEN type_documents.codigo = '07' THEN -billings.total ELSE billings.total END) as net_total")
+            ->value('net_total');
+        $salesTotal = round((float) (clone $saleNotesValid)->sum('total') + $billingsNetTotal, 2);
         $annulledCount = (clone $saleNotesAnnulled)->count() + (clone $billingsAnnulled)->count();
         $annulledTotal = (float) (clone $saleNotesAnnulled)->sum('total') + (float) (clone $billingsAnnulled)->sum('total');
         $grossTotal = $salesTotal + $annulledTotal;
@@ -758,11 +778,37 @@ class ArchingCashController extends Controller
     {
         $rows = collect();
 
+        $convertedSaleNoteIds = DB::table('delivery_orders')
+            ->whereNotNull('idnotaventa')
+            ->whereNotNull('idfactura')
+            ->pluck('idnotaventa')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $creditNoteDoc = TypeDocument::where('codigo', '07')->first();
+        $creditNoteDocId = $creditNoteDoc ? (int) $creditNoteDoc->id : 0;
+        $saleNoteDoc = TypeDocument::where('codigo', '02')->first();
+        $saleNoteDocId = $saleNoteDoc ? (int) $saleNoteDoc->id : 7;
+
         $groupedPayments = DetailPayment::query()
-            ->select('pay_modes.descripcion as tipo_pago', DB::raw('SUM(detail_payments.monto) as monto'))
+            ->select('pay_modes.descripcion as tipo_pago')
+            ->selectRaw('
+                SUM(CASE 
+                    WHEN detail_payments.idtipo_comprobante = ? THEN -detail_payments.monto 
+                    ELSE detail_payments.monto 
+                END) as monto
+            ', [$creditNoteDocId])
             ->join('pay_modes', 'detail_payments.idpago', '=', 'pay_modes.id')
             ->where('detail_payments.idarqueocaja', $archingCash->id)
             ->where('detail_payments.estado', 1)
+            ->when(! empty($convertedSaleNoteIds), function ($q) use ($convertedSaleNoteIds, $saleNoteDocId) {
+                $q->whereNot(function ($sub) use ($convertedSaleNoteIds, $saleNoteDocId) {
+                    $sub->whereIn('detail_payments.idtipo_comprobante', [$saleNoteDocId, 7])
+                        ->whereIn('detail_payments.idfactura', $convertedSaleNoteIds);
+                });
+            })
             ->groupBy('pay_modes.descripcion')
             ->get();
 

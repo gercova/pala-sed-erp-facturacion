@@ -349,6 +349,9 @@ Route::get('/reportes/ventas', [ReportSalesController::class, 'index'])->name('r
 Route::get('/reportes/ventas/data', [ReportSalesController::class, 'getSalesReport'])->name('report.sales.data')->middleware(['auth', 'can:report.sales.index']);
 Route::get('/by-product', [ReportSalesController::class, 'salesByProductIndex'])->name('report.sales.by_product.index')->middleware(['auth', 'can:report.sales.by_product.index']);
 Route::get('/reports/sales/products', [ReportSalesController::class, 'getSalesByProduct'])->name('report.sales.products')->middleware(['auth', 'can:report.sales.by_product.index']);
+Route::get('/reports/sales/customers', [ReportSalesController::class, 'getSalesByCustomer'])->name('report.sales.customers')->middleware(['auth', 'can:report.sales.index']);
+Route::get('/reports/sales/document-types', [ReportSalesController::class, 'getSalesByDocumentType'])->name('report.sales.document_types')->middleware(['auth', 'can:report.sales.index']);
+Route::get('/reports/sales/reconciliation', [ReportSalesController::class, 'getReconciliationReport'])->name('report.sales.reconciliation')->middleware(['auth', 'can:report.sales.index']);
 Route::get('/reportes/pagos', [ReportPaymentController::class, 'index'])->name('report.payments.index')->middleware(['auth', 'can:report.payments.index']);
 Route::get('/reports/sales/payment-methods', [ReportPaymentController::class, 'getSalesByPaymentMethod'])->name('report.sales.payment_methods')->middleware(['auth', 'can:report.payments.index']);
 
