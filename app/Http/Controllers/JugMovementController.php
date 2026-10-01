@@ -13,12 +13,9 @@ use Yajra\DataTables\Facades\DataTables;
 
 class JugMovementController extends Controller
 {
-    protected JugMovementService $jugService;
-
-    public function __construct(JugMovementService $jugService)
-    {
-        $this->jugService = $jugService;
-    }
+    public function __construct(
+        protected JugMovementService $jugService
+    ) {}
 
     public function index()
     {
@@ -39,16 +36,48 @@ class JugMovementController extends Controller
     public function get(Request $request)
     {
         $clients = Client::query()
-            ->select(['id', 'nro_documento', 'nombres', 'telefono', 'direccion', 'saldo_envases'])
+            ->select([
+                'clients.id',
+                'clients.nro_documento',
+                'clients.nombres',
+                'clients.telefono',
+                'clients.direccion',
+                'clients.saldo_envases',
+                DB::raw('(SELECT COALESCE(SUM(devueltos_danados), 0) FROM jug_movements WHERE jug_movements.idcliente = clients.id) as total_danados'),
+                DB::raw("(SELECT COALESCE(SUM(entregados_llenos), 0) FROM jug_movements WHERE jug_movements.idcliente = clients.id AND tipo_movimiento = 'nuevo_comodato') as total_comodato"),
+            ])
             ->orderBy('saldo_envases', 'desc')
             ->orderBy('nombres', 'asc');
 
         return DataTables::of($clients)
+            ->addColumn('resumen_envases', function ($client) {
+                $possession = (int) ($client->saldo_envases ?? 0);
+                $damaged = (int) ($client->total_danados ?? 0);
+                $loan = (int) ($client->total_comodato ?? 0);
+                $total = $possession + $damaged + $loan;
+
+                $html = '<div class="d-flex flex-column gap-1">';
+                $html .= '<span class="badge bg-primary-soft text-primary fw-semibold"><i class="ri-cup-line me-1"></i>'.$possession.' en posesión</span>';
+                if ($damaged > 0) {
+                    $html .= '<span class="badge bg-danger-soft text-danger fw-semibold"><i class="ri-error-warning-line me-1"></i>'.$damaged.' dañados</span>';
+                }
+                if ($loan > 0) {
+                    $html .= '<span class="badge bg-info-soft text-info fw-semibold"><i class="ri-hand-coin-line me-1"></i>'.$loan.' en préstamo</span>';
+                }
+                $html .= '<span class="small text-muted fw-bold border-top pt-1">Total: '.$total.' envases</span>';
+                $html .= '</div>';
+
+                return $html;
+            })
             ->addColumn('status_badge', function ($client) {
-                if ($client->saldo_envases > 5) {
-                    return '<span class="badge bg-danger-soft text-danger fw-semibold">' . $client->saldo_envases . ' pendientes</span>';
-                } elseif ($client->saldo_envases > 0) {
-                    return '<span class="badge bg-warning-soft text-warning fw-semibold">' . $client->saldo_envases . ' pendientes</span>';
+                $balance = (int) ($client->saldo_envases ?? 0);
+
+                if ($balance < 0) {
+                    return '<span class="badge bg-danger text-white fw-bold"><i class="ri-error-warning-fill me-1"></i>Alerta: Saldo Anormal ('.$balance.')</span>';
+                } elseif ($balance >= 10) {
+                    return '<span class="badge bg-warning text-dark fw-bold"><i class="ri-alert-line me-1"></i>Alerta: Saldo Alto ('.$balance.')</span>';
+                } elseif ($balance > 0) {
+                    return '<span class="badge bg-warning-soft text-warning fw-semibold">'.$balance.' pendientes</span>';
                 } else {
                     return '<span class="badge bg-success-soft text-success fw-semibold">Al día (0)</span>';
                 }
@@ -57,29 +86,29 @@ class JugMovementController extends Controller
                 return '
                     <div class="d-flex justify-content-center gap-1">
                         <button class="btn btn-sm btn-outline-primary btn-record-return" 
-                            data-id="' . $client->id . '" 
-                            data-name="' . htmlspecialchars($client->nombres) . '" 
-                            data-balance="' . $client->saldo_envases . '" 
+                            data-id="'.$client->id.'" 
+                            data-name="'.htmlspecialchars($client->nombres).'" 
+                            data-balance="'.$client->saldo_envases.'" 
                             title="Registrar devolución">
                             <i class="ri-arrow-go-back-line"></i> Devolución
                         </button>
                         <button class="btn btn-sm btn-outline-secondary btn-client-history" 
-                            data-id="' . $client->id . '" 
-                            data-name="' . htmlspecialchars($client->nombres) . '" 
+                            data-id="'.$client->id.'" 
+                            data-name="'.htmlspecialchars($client->nombres).'" 
                             title="Ver historial">
                             <i class="ri-history-line"></i>
                         </button>
                         <button class="btn btn-sm btn-outline-warning btn-adjust-balance" 
-                            data-id="' . $client->id . '" 
-                            data-name="' . htmlspecialchars($client->nombres) . '" 
-                            data-balance="' . $client->saldo_envases . '" 
+                            data-id="'.$client->id.'" 
+                            data-name="'.htmlspecialchars($client->nombres).'" 
+                            data-balance="'.$client->saldo_envases.'" 
                             title="Ajuste manual">
                             <i class="ri-equalizer-line"></i>
                         </button>
                     </div>
                 ';
             })
-            ->rawColumns(['status_badge', 'acciones'])
+            ->rawColumns(['resumen_envases', 'status_badge', 'acciones'])
             ->make(true);
     }
 
@@ -103,24 +132,26 @@ class JugMovementController extends Controller
             ->editColumn('tipo_movimiento', function ($row) {
                 $badges = [
                     'entrega_recarga' => '<span class="badge bg-primary-soft text-primary">Recarga</span>',
-                    'nuevo_comodato' => '<span class="badge bg-info-soft text-info">Nuevo Envase</span>',
+                    'nuevo_comodato' => '<span class="badge bg-info-soft text-info">Nuevo Envase (Préstamo)</span>',
                     'devolucion_intactos' => '<span class="badge bg-success-soft text-success">Dev. Intactos</span>',
                     'devolucion_danados' => '<span class="badge bg-danger-soft text-danger">Dev. Dañados</span>',
                     'ajuste' => '<span class="badge bg-secondary-soft text-secondary">Ajuste</span>',
                 ];
-                return $badges[$row->tipo_movimiento] ?? '<span class="badge bg-light text-dark">' . $row->tipo_movimiento . '</span>';
+
+                return $badges[$row->tipo_movimiento] ?? '<span class="badge bg-light text-dark">'.$row->tipo_movimiento.'</span>';
             })
             ->addColumn('detalle_cantidades', function ($row) {
                 $html = [];
                 if ($row->entregados_llenos > 0) {
-                    $html[] = '<span class="text-primary fw-semibold">+' . $row->entregados_llenos . ' llenos</span>';
+                    $html[] = '<span class="text-primary fw-semibold">+'.$row->entregados_llenos.' llenos</span>';
                 }
                 if ($row->devueltos_intactos > 0) {
-                    $html[] = '<span class="text-success fw-semibold">-' . $row->devueltos_intactos . ' intactos</span>';
+                    $html[] = '<span class="text-success fw-semibold">-'.$row->devueltos_intactos.' intactos</span>';
                 }
                 if ($row->devueltos_danados > 0) {
-                    $html[] = '<span class="text-danger fw-semibold">-' . $row->devueltos_danados . ' rotos (S/ ' . number_format($row->costo_dano, 2) . ')</span>';
+                    $html[] = '<span class="text-danger fw-semibold">-'.$row->devueltos_danados.' rotos (S/ '.number_format($row->costo_dano, 2).')</span>';
                 }
+
                 return empty($html) ? '-' : implode('<br>', $html);
             })
             ->rawColumns(['tipo_movimiento', 'detalle_cantidades'])
@@ -186,7 +217,7 @@ class JugMovementController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'idcliente' => 'required|exists:clients,id',
-            'nuevo_saldo' => 'required|integer|min:0',
+            'nuevo_saldo' => 'required|integer',
             'motivo' => 'required|string|max:255',
         ]);
 
@@ -218,15 +249,17 @@ class JugMovementController extends Controller
     public function client_history($id)
     {
         $client = Client::findOrFail($id);
+        $summary = $this->jugService->getClientJugSummary($client);
         $movements = JugMovement::where('idcliente', $id)
             ->with(['usuario', 'deliveryOrder'])
             ->orderBy('fecha', 'desc')
-            ->limit(30)
+            ->limit(50)
             ->get();
 
         return response()->json([
             'status' => true,
             'cliente' => $client,
+            'summary' => $summary,
             'movements' => $movements,
         ]);
     }

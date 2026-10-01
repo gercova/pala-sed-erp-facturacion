@@ -16,7 +16,7 @@
         @if ($loyalty['reward_eligible'] ?? false)
             <div
                 style="background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:.65rem 1rem; font-size:.82rem; color:#15803d; font-weight:600; display:flex; align-items:center; gap:.4rem;">
-                🎁 ¡Tienes un bidón GRATIS disponible por fidelidad!
+                🎁 ¡Tienes {{ ($loyalty['bonus'] ?? 1) > 1 ? $loyalty['bonus'].' bidones' : 'un bidón' }} GRATIS disponible por fidelidad!
             </div>
         @endif
     </div>
@@ -84,7 +84,7 @@
                     <div id="summary-items"></div>
                     @if ($loyalty['reward_eligible'] ?? false)
                         <div class="summary-row discount">
-                            <span>🎁 Premio fidelidad (1 recarga gratis)</span>
+                            <span>🎁 Premio fidelidad ({{ ($loyalty['bonus'] ?? 1) > 1 ? $loyalty['bonus'].' recargas gratis' : '1 recarga gratis' }})</span>
                             <span id="summary-discount">-S/ 0.00</span>
                         </div>
                     @endif

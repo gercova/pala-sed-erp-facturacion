@@ -116,8 +116,8 @@
                                     <th>Documento</th>
                                     <th>Cliente</th>
                                     <th>Teléfono</th>
-                                    <th>Dirección</th>
-                                    <th>Saldo de Envases</th>
+                                    <th width="28%">Resumen de Envases (Posesión / Dañados / Préstamo)</th>
+                                    <th>Estado / Alerta</th>
                                     <th class="text-center" width="18%">Acciones</th>
                                 </tr>
                             </thead>

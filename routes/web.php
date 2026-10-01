@@ -72,23 +72,23 @@ Route::get('/home/reporte-ingresos', [HomeController::class, 'reporteIngresos'])
 Route::get('/home/metodo-pagos', [HomeController::class, 'metodosPagoVentas'])->name('home.metodo_pagos')->middleware(['auth', 'can:admin.home']);
 
 Route::controller(Businesscontroller::class)->prefix('business')->middleware(['auth', 'can:admin.business'])->group(function () {
-    Route::get('/',                 'index')->name('admin.business');
-    Route::post('/load-ubigeo',     'load_ubigeo')->name('admin.load_ubigeo');
-    Route::post('/load-provinces',  'load_provinces')->name('admin.load_provinces');
-    Route::post('/load-districts',  'load_districts')->name('admin.load_districts');
-    Route::post('/load-logo',       'load_logo')->name('business.load_logo');
-    Route::post('/save-info',       'save_info')->name('business.save_info');
-    Route::post('/save-sunat',      'save_sunat')->name('business.save_sunat');
-    Route::post('/save-whatsapp',   'save_whatsapp')->name('business.save_whatsapp');
+    Route::get('/', 'index')->name('admin.business');
+    Route::post('/load-ubigeo', 'load_ubigeo')->name('admin.load_ubigeo');
+    Route::post('/load-provinces', 'load_provinces')->name('admin.load_provinces');
+    Route::post('/load-districts', 'load_districts')->name('admin.load_districts');
+    Route::post('/load-logo', 'load_logo')->name('business.load_logo');
+    Route::post('/save-info', 'save_info')->name('business.save_info');
+    Route::post('/save-sunat', 'save_sunat')->name('business.save_sunat');
+    Route::post('/save-whatsapp', 'save_whatsapp')->name('business.save_whatsapp');
 });
 
 Route::controller(CashController::class)->prefix('cashes')->middleware(['auth', 'can:admin.cashes'])->group(function () {
-    Route::get('/',                 'index')->name('admin.cashes');
-    Route::get('/get',              'get')->name('cashes.get');
-    Route::post('/save',            'save')->name('cashes.save');
-    Route::post('/detail',          'detail')->name('cashes.detail');
-    Route::post('/store',           'store')->name('cashes.store');
-    Route::post('/delete',          'delete')->name('cashes.delete');
+    Route::get('/', 'index')->name('admin.cashes');
+    Route::get('/get', 'get')->name('cashes.get');
+    Route::post('/save', 'save')->name('cashes.save');
+    Route::post('/detail', 'detail')->name('cashes.detail');
+    Route::post('/store', 'store')->name('cashes.store');
+    Route::post('/delete', 'delete')->name('cashes.delete');
 });
 
 Route::controller(PayModeController::class)->prefix('pay-modes')->middleware(['auth', 'can:admin.paymodes'])->group(function () {
@@ -406,10 +406,11 @@ Route::controller(JugMovementController::class)->prefix('jug-movements')->middle
     Route::get('/client-history/{id}', 'client_history')->name('jug_movements.client_history');
 });
 
-// PROGRAMA DE FIDELIZACIÓN (4+1 AJUSTABLE)
+// PROGRAMA DE FIDELIZACIÓN (CONFIGURABLE: 5+1, 4+1, ETC.)
 Route::controller(LoyaltyController::class)->prefix('loyalty')->middleware(['auth', 'can:admin.loyalty'])->group(function () {
     Route::get('/', 'index')->name('admin.loyalty');
     Route::get('/get-clients', 'get_clients')->name('loyalty.get_clients');
+    Route::get('/logs', 'get_logs')->name('loyalty.logs');
     Route::post('/save-settings', 'save_settings')->name('loyalty.save_settings');
     Route::get('/check/{id}', 'check_client')->name('loyalty.check');
     Route::post('/add-point', 'add_point')->name('loyalty.add_point');

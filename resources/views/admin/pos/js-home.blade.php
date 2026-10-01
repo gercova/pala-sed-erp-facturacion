@@ -317,8 +317,59 @@
         $('#document-type-helper').text(helper);
     }
 
+    let lastLoadedClientId = null;
+
     function syncClientRuleBadge() {
-        $('#client-rule-message').text('');
+        const clientId = $('#select-client').val();
+        if (!clientId) {
+            $('#pos-client-summary-box').addClass('d-none');
+            $('#pos-client-badges').empty();
+            lastLoadedClientId = null;
+            return;
+        }
+
+        if (clientId === lastLoadedClientId) {
+            return;
+        }
+
+        lastLoadedClientId = clientId;
+
+        $.ajax({
+            url: `/loyalty/check/${clientId}`,
+            method: 'GET',
+            success: function(r) {
+                if (!r.status) return;
+
+                const $badges = $('#pos-client-badges').empty();
+                $('#pos-client-summary-box').removeClass('d-none');
+
+                // Fidelización dinámica
+                if (r.loyalty && r.loyalty.has_promotion) {
+                    const l = r.loyalty;
+                    if (l.reward_eligible) {
+                        $badges.append(`<span class="badge bg-success text-white py-1 px-2"><i class="ri-gift-line me-1"></i>¡Premio Listo! (${l.accumulated}/${l.target})</span>`);
+                    } else {
+                        $badges.append(`<span class="badge bg-light text-primary border py-1 px-2"><i class="ri-award-line me-1"></i>${l.rule_label}: ${l.accumulated}/${l.target} (faltan ${l.remaining_to_free})</span>`);
+                    }
+                }
+
+                // Balance y alerta de envases
+                if (r.cliente && r.cliente.jug_summary) {
+                    const j = r.cliente.jug_summary;
+                    if (j.es_anormal) {
+                        $badges.append(`<span class="badge bg-danger text-white py-1 px-2"><i class="ri-error-warning-line me-1"></i>${j.mensaje_alerta}</span>`);
+                    } else if (j.en_posesion > 0) {
+                        $badges.append(`<span class="badge bg-warning-soft text-warning border py-1 px-2"><i class="ri-cup-line me-1"></i>Envases: ${j.en_posesion} en posesión</span>`);
+                    } else {
+                        $badges.append(`<span class="badge bg-success-soft text-success border py-1 px-2"><i class="ri-check-line me-1"></i>Envases al día (0)</span>`);
+                    }
+
+                    if (j.danados > 0) {
+                        $badges.append(`<span class="badge bg-danger-soft text-danger border py-1 px-2">${j.danados} dañados hist.</span>`);
+                    }
+                }
+            }
+        });
     }
 
     function syncSummary() {

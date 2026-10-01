@@ -8,12 +8,15 @@ use App\Models\ArchingCash;
 use App\Models\Billing;
 use App\Models\Business;
 use App\Models\Client;
+use App\Models\Currency;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderStatusLog;
 use App\Models\DetailBilling;
 use App\Models\DetailPayment;
 use App\Models\DetailSaleNote;
+use App\Models\IgvTypeAffection;
 use App\Models\PayMode;
+use App\Models\Product;
 use App\Models\SaleNote;
 use App\Models\Serie;
 use App\Models\StockProduct;
@@ -243,16 +246,8 @@ class DeliverySettlementService
                 notes: "Liquidación orden {$lockedOrder->codigo_orden} - Motivo: {$motivo}"
             );
 
-            // Acumular puntos de fidelidad por recargas entregadas
-            $eligibleCount = 0;
-            foreach ($lockedOrder->items as $item) {
-                if ($item->tipo_item === 'recarga' || stripos($item->descripcion, 'recarga') !== false) {
-                    $eligibleCount += (int) $item->cantidad;
-                }
-            }
-            if ($eligibleCount > 0) {
-                $this->loyaltyService->accumulatePurchases($client, $eligibleCount);
-            }
+            // Acumular puntos de fidelidad por recargas entregadas (centralizado y anti-duplicación)
+            $this->loyaltyService->accumulateFromDeliveryOrder($lockedOrder);
 
             // Invariante B1: Descuento de stock en almacén para productos físicos inventariables
             foreach ($lockedOrder->items as $item) {
@@ -370,6 +365,9 @@ class DeliverySettlementService
                         $isTaxed = (bool) ($business?->cobrar_igv ?? false);
                         $gravada = $isTaxed ? round($finalTotal / 1.18, 2) : $finalTotal;
                         $igv = $isTaxed ? round($finalTotal - $gravada, 2) : 0.00;
+                        $afectacionId = (int) (IgvTypeAffection::where('codigo', $isTaxed ? '10' : '20')->value('id') ?? IgvTypeAffection::first()?->id ?? 1);
+                        $currencyId = (int) (Currency::where('codigo', 'PEN')->value('id') ?? Currency::first()?->id ?? 1);
+                        $defaultProductId = (int) ($lockedOrder->items->first()?->idproducto ?? Product::first()?->id ?? 1);
 
                         $issuedDocument = Billing::create([
                             'idtipo_comprobante' => (int) $docType->id,
@@ -379,7 +377,7 @@ class DeliverySettlementService
                             'fecha_vencimiento' => $todayDate,
                             'hora' => $nowTime,
                             'idcliente' => (int) $client->id,
-                            'idmoneda' => 1,
+                            'idmoneda' => $currencyId,
                             'idpago' => $payMode->id,
                             'modo_pago' => 1,
                             'sunat_forma_pago' => 'Contado',
@@ -422,14 +420,14 @@ class DeliverySettlementService
 
                             DetailBilling::create([
                                 'idfacturacion' => $issuedDocument->id,
-                                'idproducto' => $item->idproducto ?: 1,
+                                'idproducto' => $item->idproducto ?: $defaultProductId,
                                 'cantidad' => $item->cantidad,
                                 'descuento' => 0,
                                 'igv' => $itemIgv,
                                 'icbper' => 0,
                                 'factor_icbper' => null,
                                 'cantidad_bolsas' => 0,
-                                'id_afectacion_igv' => $isTaxed ? 1 : 20,
+                                'id_afectacion_igv' => $afectacionId,
                                 'precio_unitario' => $itemPrecioUnitario,
                                 'valor_unitario' => $itemValorUnitario,
                                 'valor_total' => $itemValorTotal,
@@ -443,14 +441,14 @@ class DeliverySettlementService
 
                             DetailBilling::create([
                                 'idfacturacion' => $issuedDocument->id,
-                                'idproducto' => 1,
+                                'idproducto' => $defaultProductId,
                                 'cantidad' => max(1, $damaged),
                                 'descuento' => 0,
                                 'igv' => $dmgIgv,
                                 'icbper' => 0,
                                 'factor_icbper' => null,
                                 'cantidad_bolsas' => 0,
-                                'id_afectacion_igv' => $isTaxed ? 1 : 20,
+                                'id_afectacion_igv' => $afectacionId,
                                 'precio_unitario' => round($damageCost / max(1, $damaged), 2),
                                 'valor_unitario' => round($dmgValor / max(1, $damaged), 2),
                                 'valor_total' => $dmgValor,
@@ -482,11 +480,15 @@ class DeliverySettlementService
             // Despacho de Jobs en cola tras commit (afterCommit)
             if ($issuedDocument) {
                 DB::afterCommit(function () use ($issuedDocument, $issuedKind, $lockedOrder) {
-                    if ($issuedDocument instanceof Billing) {
-                        EmitirComprobanteJob::dispatch($issuedDocument->id);
-                    }
+                    try {
+                        if ($issuedDocument instanceof Billing) {
+                            EmitirComprobanteJob::dispatch($issuedDocument->id);
+                        }
 
-                    EnviarWhatsAppJob::dispatch($issuedKind, $issuedDocument->id, $lockedOrder->id);
+                        EnviarWhatsAppJob::dispatch($issuedKind, $issuedDocument->id, $lockedOrder->id);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('Error en despacho de jobs tras liquidación de pedido: '.$e->getMessage());
+                    }
                 });
             }
 

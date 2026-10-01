@@ -317,7 +317,7 @@
                         <span class="fw-bold text-dark" id="display-subtotal">S/ 0.00</span>
                     </div>
                     <div id="row-discount" class="d-flex justify-content-between align-items-center mb-1 d-none text-success">
-                        <span>¡Descuento Fidelidad (1 Bidón GRATIS)!:</span>
+                        <span id="loyalty-discount-label">¡Descuento Fidelidad (Premio GRATIS)!:</span>
                         <span class="fw-bold" id="display-discount">-S/ 0.00</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
@@ -476,9 +476,13 @@
                             if (r.loyalty && r.loyalty.has_promotion) {
                                 let l = r.loyalty;
                                 $('#client-loyalty-box').removeClass('d-none');
-                                $('#loyalty-client-welcome').text(`¡Hola de nuevo, ${c.nombres}!`);
-                                $('#loyalty-badge').text(`${l.accumulated}/${l.target} compras`);
+                                $('#loyalty-badge').text(`${l.rule_label || 'Fidelidad'}: ${l.accumulated}/${l.target}`);
                                 $('#loyalty-message').text(l.message);
+                                if (l.bonus > 1) {
+                                    $('#loyalty-discount-label').text(`¡Descuento Fidelidad (${l.bonus} Bidones GRATIS)!:`);
+                                } else {
+                                    $('#loyalty-discount-label').text('¡Descuento Fidelidad (1 Bidón GRATIS)!:');
+                                }
 
                                 clientEligibleForFree = l.reward_eligible;
                                 calculateTotals();

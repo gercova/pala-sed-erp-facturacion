@@ -10,6 +10,7 @@ class LoyaltyPromotion extends Model
     use HasFactory;
 
     protected $table = 'loyalty_promotions';
+
     protected $primaryKey = 'id';
 
     protected $fillable = [
@@ -41,5 +42,27 @@ class LoyaltyPromotion extends Model
     public function balancesClientes()
     {
         return $this->hasMany(ClientLoyalty::class, 'idpromocion');
+    }
+
+    public function logs()
+    {
+        return $this->hasMany(LoyaltyPromotionLog::class, 'idpromocion')->latest('id');
+    }
+
+    public function getRuleLabelAttribute(): string
+    {
+        return "{$this->meta_compras}+{$this->bonificacion}";
+    }
+
+    public function getRuleTextAttribute(): string
+    {
+        return "{$this->meta_compras} más {$this->bonificacion}";
+    }
+
+    public function getSummaryTextAttribute(): string
+    {
+        $bonus = $this->bonificacion > 1 ? "{$this->bonificacion} GRATIS" : '1 GRATIS';
+
+        return "Por cada {$this->meta_compras} compras, ¡{$bonus}!";
     }
 }

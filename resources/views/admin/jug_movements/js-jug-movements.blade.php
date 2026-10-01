@@ -11,8 +11,8 @@
                 { data: 'nro_documento', name: 'nro_documento' },
                 { data: 'nombres', name: 'nombres', className: 'fw-semibold text-dark' },
                 { data: 'telefono', name: 'telefono' },
-                { data: 'direccion', name: 'direccion' },
-                { data: 'status_badge', name: 'status_badge', className: 'text-center' },
+                { data: 'resumen_envases', name: 'saldo_envases', orderable: false, searchable: false },
+                { data: 'status_badge', name: 'status_badge', className: 'text-center', orderable: false },
                 { data: 'acciones', name: 'acciones', orderable: false, searchable: false, className: 'text-center' }
             ],
             order: [[4, 'desc']],
@@ -129,6 +129,20 @@
                 url: "{{ url('jug-movements/client-history') }}/" + id,
                 method: "GET",
                 success: function(r) {
+                    if (r.summary) {
+                        $('#history-sum-possession').text(r.summary.en_posesion);
+                        $('#history-sum-damaged').text(r.summary.danados);
+                        $('#history-sum-loan').text(r.summary.en_prestamo);
+                        $('#history-sum-total').text(r.summary.total_envases);
+
+                        if (r.summary.es_anormal) {
+                            $('#history-alert-box').removeClass('d-none');
+                            $('#history-alert-text').text(r.summary.mensaje_alerta);
+                        } else {
+                            $('#history-alert-box').addClass('d-none');
+                        }
+                    }
+
                     let rows = '';
                     if (r.movements.length === 0) {
                         rows = '<tr><td colspan="7" class="text-center py-3 text-muted">Sin movimientos registrados.</td></tr>';

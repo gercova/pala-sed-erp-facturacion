@@ -467,6 +467,9 @@
                                     <div class="checkout-select-wrap">
                                         <select id="select-client" class="form-select" name="dni_ruc"></select>
                                     </div>
+                                    <div id="pos-client-summary-box" class="mt-2 d-none">
+                                        <div class="d-flex flex-wrap gap-1 align-items-center" id="pos-client-badges"></div>
+                                    </div>
                                 </div>
 
                                 <div class="checkout-section">

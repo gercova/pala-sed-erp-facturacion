@@ -114,6 +114,37 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body p-0">
+                <div class="p-3 border-bottom bg-white" id="history-summary-container">
+                    <div id="history-alert-box" class="alert alert-danger py-2 px-3 small d-none mb-3">
+                        <i class="ri-error-warning-fill me-1"></i> <span id="history-alert-text"></span>
+                    </div>
+                    <div class="row g-2 text-center">
+                        <div class="col-3">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted text-uppercase" style="font-size:10px;">En Posesión</div>
+                                <div class="h5 mb-0 text-primary fw-bold" id="history-sum-possession">0</div>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted text-uppercase" style="font-size:10px;">Dañados Hist.</div>
+                                <div class="h5 mb-0 text-danger fw-bold" id="history-sum-damaged">0</div>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted text-uppercase" style="font-size:10px;">En Préstamo</div>
+                                <div class="h5 mb-0 text-info fw-bold" id="history-sum-loan">0</div>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted text-uppercase" style="font-size:10px;">Total Envases</div>
+                                <div class="h5 mb-0 text-dark fw-bold" id="history-sum-total">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                     <table class="table table-sm align-middle mb-0">
                         <thead class="table-light sticky-top">

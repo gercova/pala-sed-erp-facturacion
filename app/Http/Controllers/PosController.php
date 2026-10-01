@@ -22,6 +22,7 @@ use App\Models\TypeDocument;
 use App\Models\Warehouse;
 use App\Services\Ebilling\Payload\BillingPayloadBuilder;
 use App\Services\Ebilling\SunatDispatchService;
+use App\Services\Water\LoyaltyService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -34,6 +35,10 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class PosController extends Controller
 {
+    public function __construct(
+        protected LoyaltyService $loyaltyService
+    ) {}
+
     public function index()
     {
         $billingSummary = $this->billingsByCurrentWarehouse()
@@ -1322,6 +1327,13 @@ class PosController extends Controller
             session()->forget('from_delivery_order_id');
         }
 
+        // Acumular puntos de fidelidad en un único punto centralizado (previene doble acumulación si vino de delivery)
+        $loyaltyStatus = $this->loyaltyService->accumulateFromPosSale(
+            $client,
+            $cart['products'] ?? [],
+            $deliveryOrderId ? (int) $deliveryOrderId : null
+        );
+
         return response()->json([
             'status' => true,
             'id' => $result['document_id'],
@@ -1330,6 +1342,7 @@ class PosController extends Controller
             'pdf' => $result['base_name'].'.pdf',
             'msg' => $result['msg'] ?? 'Venta registrada correctamente.',
             'type_document' => (int) $documentType->id,
+            'loyalty' => $loyaltyStatus,
         ]);
     }
 

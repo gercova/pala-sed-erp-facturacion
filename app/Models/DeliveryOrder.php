@@ -43,12 +43,16 @@ class DeliveryOrder extends Model
         'idarqueocaja',
         'liquidado_at',
         'motivo_liquidacion',
+        'puntos_fidelidad_acumulados',
+        'fecha_acumulacion_fidelidad',
     ];
 
     protected $casts = [
         'fecha_programada' => 'date',
         'fecha_entrega' => 'datetime',
         'liquidado_at' => 'datetime',
+        'fecha_acumulacion_fidelidad' => 'datetime',
+        'puntos_fidelidad_acumulados' => 'boolean',
         'subtotal' => 'decimal:2',
         'descuento' => 'decimal:2',
         'total' => 'decimal:2',

@@ -65,6 +65,11 @@ class DeliverySettlementAndInterfaceTest extends TestCase
             'telefono' => '942001122',
         ]);
 
+        $this->seed(\Database\Seeders\TypeDocumentSeeder::class);
+        $this->seed(\Database\Seeders\CurrencySeeder::class);
+        $this->seed(\Database\Seeders\IgvTypeAffectionSeeder::class);
+        $this->seed(\Database\Seeders\SerieSeeder::class);
+
         // 2. Identity Document Type
         $doc = IdentityDocumentType::firstOrCreate(
             ['codigo' => '1'],

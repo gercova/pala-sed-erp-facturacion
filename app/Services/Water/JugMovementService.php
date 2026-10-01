@@ -12,17 +12,15 @@ class JugMovementService
     /**
      * Registrar un movimiento de envases para un cliente y actualizar su saldo.
      *
-     * @param Client $client
-     * @param int $deliveredFull Bidones llenos entregados al cliente
-     * @param int $returnedIntact Bidones vacíos recibidos en buen estado
-     * @param int $returnedDamaged Bidones vacíos devueltos rotos/dañados
-     * @param float $damageCost Cobro aplicado por reposición de envases dañados
-     * @param string $movementType Tipo de movimiento
-     * @param int|null $orderId ID de la orden de delivery (opcional)
-     * @param int|null $warehouseId ID del almacén (opcional)
-     * @param int|null $userId ID del usuario que registra
-     * @param string|null $notes Observaciones
-     * @return JugMovement
+     * @param  int  $deliveredFull  Bidones llenos entregados al cliente
+     * @param  int  $returnedIntact  Bidones vacíos recibidos en buen estado
+     * @param  int  $returnedDamaged  Bidones vacíos devueltos rotos/dañados
+     * @param  float  $damageCost  Cobro aplicado por reposición de envases dañados
+     * @param  string  $movementType  Tipo de movimiento
+     * @param  int|null  $orderId  ID de la orden de delivery (opcional)
+     * @param  int|null  $warehouseId  ID del almacén (opcional)
+     * @param  int|null  $userId  ID del usuario que registra
+     * @param  string|null  $notes  Observaciones
      */
     public function recordMovement(
         Client $client,
@@ -100,7 +98,7 @@ class JugMovementService
                 'costo_dano' => 0,
                 'saldo_anterior' => $prevBalance,
                 'saldo_nuevo' => $newBalance,
-                'observaciones' => 'Ajuste manual de saldo: ' . $reason,
+                'observaciones' => 'Ajuste manual de saldo: '.$reason,
                 'fecha' => Carbon::now(),
             ]);
 
@@ -110,5 +108,47 @@ class JugMovementService
 
             return $movement;
         });
+    }
+
+    /**
+     * Resumen completo de envases por cliente: en posesión, dañados, en préstamo/comodato y alertas.
+     */
+    public function getClientJugSummary(Client $client): array
+    {
+        $inPossession = (int) ($client->saldo_envases ?? 0);
+
+        $movements = JugMovement::where('idcliente', $client->id)->get();
+        $damaged = (int) $movements->sum('devueltos_danados');
+        $onLoan = (int) $movements->where('tipo_movimiento', 'nuevo_comodato')->sum('entregados_llenos');
+        $totalDelivered = (int) $movements->sum('entregados_llenos');
+        $totalReturnedIntact = (int) $movements->sum('devueltos_intactos');
+
+        $totalContainers = $inPossession + $damaged + $onLoan;
+
+        $isAbnormal = false;
+        $alertType = 'normal'; // normal | danger | warning
+        $alertMessage = null;
+
+        if ($inPossession < 0) {
+            $isAbnormal = true;
+            $alertType = 'danger';
+            $alertMessage = "¡Alerta! Saldo negativo de envases ({$inPossession}). Revisar devoluciones no registradas.";
+        } elseif ($inPossession >= 10) {
+            $isAbnormal = true;
+            $alertType = 'warning';
+            $alertMessage = "Advertencia: Cliente tiene saldo elevado ({$inPossession} envases en posesión).";
+        }
+
+        return [
+            'en_posesion' => $inPossession,
+            'danados' => $damaged,
+            'en_prestamo' => $onLoan,
+            'total_envases' => $totalContainers,
+            'total_historico_entregados' => $totalDelivered,
+            'total_historico_devueltos' => $totalReturnedIntact,
+            'es_anormal' => $isAbnormal,
+            'tipo_alerta' => $alertType,
+            'mensaje_alerta' => $alertMessage,
+        ];
     }
 }
