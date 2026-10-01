@@ -612,7 +612,7 @@ class DeliverySettlementService
 
         return PayMode::whereRaw('LOWER(descripcion) LIKE ?', ['%efectivo%'])->first()
             ?? PayMode::first()
-            ?? PayMode::create(['descripcion' => 'Efectivo', 'estado' => 1]);
+            ?? PayMode::create(['descripcion' => 'Efectivo']);
     }
 
     /**

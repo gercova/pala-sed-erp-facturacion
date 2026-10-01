@@ -89,8 +89,8 @@ class DeliverySettlementAndInterfaceTest extends TestCase
         ]);
 
         // 4. PayModes
-        $this->payModeEfectivo = PayMode::firstOrCreate(['id' => 1], ['descripcion' => 'Efectivo', 'estado' => 1]);
-        $this->payModeYape = PayMode::firstOrCreate(['id' => 2], ['descripcion' => 'Yape', 'estado' => 1]);
+        $this->payModeEfectivo = PayMode::firstOrCreate(['id' => 1], ['descripcion' => 'Efectivo']);
+        $this->payModeYape = PayMode::firstOrCreate(['id' => 2], ['descripcion' => 'Yape']);
 
         // 5. Roles and Permissions
         $pDeliveries = Permission::firstOrCreate(['name' => 'admin.deliveries', 'guard_name' => 'web']);
@@ -602,5 +602,16 @@ class DeliverySettlementAndInterfaceTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $summary['total_danados']);
         $this->assertGreaterThanOrEqual(10, $summary['total_entregados']);
         $this->assertGreaterThanOrEqual(8, $summary['total_devueltos']);
+    }
+
+    /**
+     * Requirement: Verify /deliveries HTML view loads without SQL column errors.
+     */
+    public function test_deliveries_view_loads_successfully_without_database_errors(): void
+    {
+        $response = $this->actingAs($this->adminUser)->get(route('admin.deliveries'));
+        $response->assertStatus(200);
+        $response->assertViewIs('admin.deliveries.list');
+        $response->assertViewHas('payModes');
     }
 }

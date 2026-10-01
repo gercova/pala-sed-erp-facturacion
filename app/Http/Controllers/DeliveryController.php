@@ -61,7 +61,7 @@ class DeliveryController extends Controller
 
         $clients = Client::orderBy('nombres')->get(['id', 'nombres', 'nro_documento', 'telefono', 'direccion', 'saldo_envases']);
         $products = Product::where('opcion', 1)->orderBy('descripcion')->get();
-        $payModes = PayMode::where('estado', 1)->orderBy('descripcion')->get();
+        $payModes = PayMode::orderBy('descripcion')->get();
 
         $canBill = $user && ($user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO', 'CONTABILIDAD', 'VENDEDOR']) || $user->can('admin.pos'));
 
