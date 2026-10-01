@@ -17,14 +17,26 @@ class WaterDistributionSeeder extends Seeder
     public function run(): void
     {
         $now = Carbon::now();
-        $warehouse = Warehouse::orderBy('id')->first();
-        $unitNiu = Unit::where('codigo', 'NIU')->first() ?? Unit::first();
-        $warehouseId = $warehouse?->id ?? 1;
+        $warehouse = Warehouse::firstOrCreate(
+            ['id' => 1],
+            ['descripcion' => 'Almacén Central', 'direccion' => 'Jr. Central 123']
+        );
+        $unitNiu = Unit::firstOrCreate(
+            ['codigo' => 'NIU'],
+            ['descripcion' => 'UNIDAD', 'estado' => 1]
+        );
+        $warehouseId = $warehouse->id;
 
         // Categoría de Agua y Bidones
         $category = Category::firstOrCreate(
             ['descripcion' => 'AGUA Y BIDONES']
         );
+
+        $igvAffection = \App\Models\IgvTypeAffection::firstOrCreate(
+            ['codigo' => '10'],
+            ['descripcion' => 'Gravado - Operacion Onerosa', 'tipo' => 'GRAV', 'estado' => true]
+        );
+        $idcodigoIgv = $igvAffection->id;
 
         // Productos esenciales
         $waterProducts = [
@@ -36,7 +48,7 @@ class WaterDistributionSeeder extends Seeder
                 'idunidad' => $unitNiu->id,
                 'idcategoria' => $category->id,
                 'igv' => 18.00,
-                'idcodigo_igv' => 1,
+                'idcodigo_igv' => $idcodigoIgv,
                 'precio_compra' => 4.00,
                 'precio_venta' => 15.00,
                 'opcion' => 1,
@@ -50,7 +62,7 @@ class WaterDistributionSeeder extends Seeder
                 'idunidad' => $unitNiu->id,
                 'idcategoria' => $category->id,
                 'igv' => 18.00,
-                'idcodigo_igv' => 1,
+                'idcodigo_igv' => $idcodigoIgv,
                 'precio_compra' => 16.00,
                 'precio_venta' => 35.00,
                 'opcion' => 1,
@@ -64,7 +76,7 @@ class WaterDistributionSeeder extends Seeder
                 'idunidad' => $unitNiu->id,
                 'idcategoria' => $category->id,
                 'igv' => 18.00,
-                'idcodigo_igv' => 1,
+                'idcodigo_igv' => $idcodigoIgv,
                 'precio_compra' => 12.00,
                 'precio_venta' => 20.00,
                 'opcion' => 1,
@@ -78,7 +90,7 @@ class WaterDistributionSeeder extends Seeder
                 'idunidad' => $unitNiu->id,
                 'idcategoria' => $category->id,
                 'igv' => 18.00,
-                'idcodigo_igv' => 1,
+                'idcodigo_igv' => $idcodigoIgv,
                 'precio_compra' => 14.00,
                 'precio_venta' => 25.00,
                 'opcion' => 1,
@@ -92,7 +104,7 @@ class WaterDistributionSeeder extends Seeder
                 'idunidad' => $unitNiu->id,
                 'idcategoria' => $category->id,
                 'igv' => 18.00,
-                'idcodigo_igv' => 1,
+                'idcodigo_igv' => $idcodigoIgv,
                 'precio_compra' => 18.00,
                 'precio_venta' => 30.00,
                 'opcion' => 1,

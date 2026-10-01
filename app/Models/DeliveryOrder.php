@@ -10,6 +10,7 @@ class DeliveryOrder extends Model
     use HasFactory;
 
     protected $table = 'delivery_orders';
+
     protected $primaryKey = 'id';
 
     protected $fillable = [
@@ -39,11 +40,15 @@ class DeliveryOrder extends Model
         'bidones_danados_recibidos',
         'cobro_envases_danados',
         'notas',
+        'idarqueocaja',
+        'liquidado_at',
+        'motivo_liquidacion',
     ];
 
     protected $casts = [
         'fecha_programada' => 'date',
         'fecha_entrega' => 'datetime',
+        'liquidado_at' => 'datetime',
         'subtotal' => 'decimal:2',
         'descuento' => 'decimal:2',
         'total' => 'decimal:2',
@@ -86,6 +91,16 @@ class DeliveryOrder extends Model
     public function comprobante()
     {
         return $this->belongsTo(Billing::class, 'idfactura');
+    }
+
+    public function arqueoCaja()
+    {
+        return $this->belongsTo(ArchingCash::class, 'idarqueocaja');
+    }
+
+    public function statusLogs()
+    {
+        return $this->hasMany(DeliveryOrderStatusLog::class, 'iddelivery_order')->latest('id');
     }
 
     public function movimientosEnvases()

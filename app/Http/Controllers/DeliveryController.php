@@ -6,9 +6,11 @@ use App\Models\Business;
 use App\Models\Client;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
+use App\Models\PayMode;
 use App\Models\Product;
 use App\Models\StockProduct;
 use App\Models\User;
+use App\Services\Water\DeliverySettlementService;
 use App\Services\Water\JugMovementService;
 use App\Services\Water\LoyaltyService;
 use Carbon\Carbon;
@@ -19,28 +21,38 @@ use Yajra\DataTables\Facades\DataTables;
 
 class DeliveryController extends Controller
 {
-    protected JugMovementService $jugService;
-
-    protected LoyaltyService $loyaltyService;
-
-    public function __construct(JugMovementService $jugService, LoyaltyService $loyaltyService)
-    {
-        $this->jugService = $jugService;
-        $this->loyaltyService = $loyaltyService;
-    }
+    public function __construct(
+        protected JugMovementService $jugService,
+        protected LoyaltyService $loyaltyService,
+        protected DeliverySettlementService $settlementService
+    ) {}
 
     public function index()
     {
         $today = Carbon::today();
+        $user = auth()->user();
+        $isRepartidor = $user && $user->hasRole('REPARTIDOR') && ! $user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO']);
+
+        $baseKpiQuery = DeliveryOrder::query();
+        if ($isRepartidor) {
+            $baseKpiQuery->where('idrepartidor', $user->id);
+        }
 
         $kpis = [
-            'pendientes' => DeliveryOrder::where('estado', 'pendiente')->count(),
-            'en_ruta' => DeliveryOrder::where('estado', 'en_ruta')->count(),
-            'entregados_hoy' => DeliveryOrder::where('estado', 'entregado')->whereDate('fecha_entrega', $today)->count(),
-            'recaudado_hoy' => (float) DeliveryOrder::where('estado', 'entregado')
+            'pendientes' => (clone $baseKpiQuery)->where('estado', 'pendiente')->count(),
+            'en_ruta' => (clone $baseKpiQuery)->where('estado', 'en_ruta')->count(),
+            'entregados_hoy' => (clone $baseKpiQuery)->where('estado', 'entregado')->whereDate('fecha_entrega', $today)->count(),
+            'recaudado_hoy' => (float) (clone $baseKpiQuery)->where('estado', 'entregado')
                 ->whereDate('fecha_entrega', $today)
                 ->where('estado_pago', 'pagado')
                 ->sum('total'),
+        ];
+
+        $containerSummary = [
+            'total_prestados' => (int) Client::sum('saldo_envases'),
+            'total_danados' => (int) DeliveryOrder::sum('bidones_danados_recibidos'),
+            'total_entregados' => (int) DeliveryOrder::where('estado', 'entregado')->sum('bidones_a_entregar'),
+            'total_devueltos' => (int) DeliveryOrder::where('estado', 'entregado')->sum('bidones_vacios_recibidos'),
         ];
 
         $repartidores = User::whereHas('roles', function ($q) {
@@ -49,27 +61,42 @@ class DeliveryController extends Controller
 
         $clients = Client::orderBy('nombres')->get(['id', 'nombres', 'nro_documento', 'telefono', 'direccion', 'saldo_envases']);
         $products = Product::where('opcion', 1)->orderBy('descripcion')->get();
+        $payModes = PayMode::where('estado', 1)->orderBy('descripcion')->get();
 
-        $user = auth()->user();
-        $canBill = $user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO', 'CONTABILIDAD', 'VENDEDOR']) || $user->can('admin.pos');
+        $canBill = $user && ($user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO', 'CONTABILIDAD', 'VENDEDOR']) || $user->can('admin.pos'));
 
-        return view('admin.deliveries.list', compact('kpis', 'repartidores', 'clients', 'products', 'canBill'));
+        return view('admin.deliveries.list', compact(
+            'kpis',
+            'containerSummary',
+            'repartidores',
+            'clients',
+            'products',
+            'payModes',
+            'canBill',
+            'isRepartidor'
+        ));
     }
 
     public function get(Request $request)
     {
+        $user = auth()->user();
+        $isRepartidor = $user && $user->hasRole('REPARTIDOR') && ! $user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO']);
+
         $query = DeliveryOrder::with(['cliente', 'repartidor'])
             ->select('delivery_orders.*')
             ->latest('id');
 
         // Filtro por rol: Si es cliente (portal), solo ve sus propios pedidos
-        if (auth()->check() && auth()->user()->hasRole('Cliente')) {
-            $clienteId = auth()->user()->idcliente;
+        if ($user && $user->hasRole('Cliente')) {
+            $clienteId = $user->idcliente;
             if ($clienteId) {
                 $query->where('idcliente', $clienteId);
             } else {
                 $query->whereRaw('1 = 0');
             }
+        } elseif ($isRepartidor) {
+            // El repartidor SOLO ve los pedidos asignados a él
+            $query->where('delivery_orders.idrepartidor', $user->id);
         }
 
         // Filtros opcionales
@@ -81,16 +108,21 @@ class DeliveryController extends Controller
             $query->whereDate('fecha_programada', $request->input('fecha'));
         }
 
-        if ($request->filled('idrepartidor')) {
+        if ($request->filled('idrepartidor') && ! $isRepartidor) {
             $query->where('idrepartidor', $request->input('idrepartidor'));
         }
 
+        // KPIs dinámicos contextualizados al rol del usuario
+        $kpiQuery = DeliveryOrder::query();
+        if ($isRepartidor) {
+            $kpiQuery->where('idrepartidor', $user->id);
+        }
         $today = Carbon::today();
         $kpis = [
-            'pendientes' => DeliveryOrder::where('estado', 'pendiente')->count(),
-            'en_ruta' => DeliveryOrder::where('estado', 'en_ruta')->count(),
-            'entregados_hoy' => DeliveryOrder::where('estado', 'entregado')->whereDate('fecha_entrega', $today)->count(),
-            'recaudado_hoy' => (float) DeliveryOrder::where('estado', 'entregado')
+            'pendientes' => (clone $kpiQuery)->where('estado', 'pendiente')->count(),
+            'en_ruta' => (clone $kpiQuery)->where('estado', 'en_ruta')->count(),
+            'entregados_hoy' => (clone $kpiQuery)->where('estado', 'entregado')->whereDate('fecha_entrega', $today)->count(),
+            'recaudado_hoy' => (float) (clone $kpiQuery)->where('estado', 'entregado')
                 ->whereDate('fecha_entrega', $today)
                 ->where('estado_pago', 'pagado')
                 ->sum('total'),
@@ -111,10 +143,17 @@ class DeliveryController extends Controller
             })
             ->editColumn('direccion_entrega', function ($row) {
                 $ref = $row->referencia ? '<br><small class="text-muted">Ref: '.htmlspecialchars($row->referencia).'</small>' : '';
-                $mapQuery = urlencode($row->coordenadas ?: ($row->direccion_entrega.', Peru'));
-                $mapBtn = '<a href="https://www.google.com/maps/search/?api=1&query='.$mapQuery.'" target="_blank" class="btn btn-xs btn-outline-danger ms-1 p-0 px-1" title="Ver en Google Maps" style="font-size: 11px;"><i class="ri-map-pin-line"></i> Mapa</a>';
+                $maps = $this->settlementService->buildMapsLinks($row);
 
-                return '<span class="text-truncate d-inline-block align-middle" style="max-width: 170px;" title="'.htmlspecialchars($row->direccion_entrega).'">'.htmlspecialchars($row->direccion_entrega).'</span>'.$mapBtn.$ref;
+                if ($maps['has_location']) {
+                    $mapBtn = '<a href="'.htmlspecialchars($maps['view_url']).'" target="_blank" rel="noopener" class="btn btn-xs btn-outline-danger ms-1 p-0 px-1" title="Ver en Google Maps" style="font-size: 11px;"><i class="ri-map-pin-line"></i> Mapa</a>';
+                    $routeBtn = '<a href="'.htmlspecialchars($maps['route_url']).'" target="_blank" rel="noopener" class="btn btn-xs btn-outline-primary ms-1 p-0 px-1" title="Cómo llegar (Ruta GPS)" style="font-size: 11px;"><i class="ri-navigation-line"></i> Ruta</a>';
+                } else {
+                    $mapBtn = '<span class="badge bg-secondary-soft text-muted ms-1 p-1" title="Sin dirección ni coordenadas" style="font-size: 10px;"><i class="ri-map-pin-line"></i> Sin Mapa</span>';
+                    $routeBtn = '';
+                }
+
+                return '<span class="text-truncate d-inline-block align-middle" style="max-width: 170px;" title="'.htmlspecialchars($row->direccion_entrega).'">'.htmlspecialchars($row->direccion_entrega).'</span>'.$mapBtn.$routeBtn.$ref;
             })
             ->addColumn('envases_badge', function ($row) {
                 $html = '<span class="badge bg-primary-soft text-primary fw-semibold">'.$row->bidones_a_entregar.' por entregar</span>';
@@ -155,14 +194,14 @@ class DeliveryController extends Controller
                     ? '<span class="badge bg-primary-soft text-primary"><i class="ri-qr-code-line"></i> QR</span>'
                     : '<span class="badge bg-light text-muted">'.ucfirst($row->origen).'</span>';
             })
-            ->addColumn('acciones', function ($row) {
+            ->addColumn('acciones', function ($row) use ($isRepartidor) {
                 $user = auth()->user();
                 $canBill = $user && ($user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO', 'CONTABILIDAD', 'VENDEDOR']) || $user->can('admin.pos'));
 
                 $items = '';
 
-                // Despachar a ruta (solo si está pendiente)
-                if ($row->estado === 'pendiente') {
+                // Despachar a ruta (solo si está pendiente y no es repartidor restringido)
+                if ($row->estado === 'pendiente' && ! $isRepartidor) {
                     $items .= '<li>
                         <a class="dropdown-item btn-assign-driver py-2" href="javascript:void(0);" data-id="'.$row->id.'" data-code="'.htmlspecialchars($row->codigo_orden).'">
                             <i class="ri-truck-line me-2 text-info align-middle"></i> Asignar y Despachar
@@ -170,17 +209,17 @@ class DeliveryController extends Controller
                     </li>';
                 }
 
-                // Completar entrega (si está en ruta o pendiente)
+                // Completar entrega y liquidación (si está en ruta o pendiente)
                 if ($row->estado === 'en_ruta' || $row->estado === 'pendiente') {
                     $items .= '<li>
-                        <a class="dropdown-item btn-complete-delivery py-2" href="javascript:void(0);" data-id="'.$row->id.'" data-code="'.htmlspecialchars($row->codigo_orden).'" data-client="'.htmlspecialchars($row->cliente?->nombres ?? '').'" data-total="'.$row->total.'" data-delivered="'.$row->bidones_a_entregar.'">
-                            <i class="ri-check-double-line me-2 text-success align-middle"></i> Completar Entrega
+                        <a class="dropdown-item btn-complete-delivery py-2" href="javascript:void(0);" data-id="'.$row->id.'" data-code="'.htmlspecialchars($row->codigo_orden).'" data-client="'.htmlspecialchars($row->cliente?->nombres ?? '').'" data-total="'.$row->total.'" data-subtotal="'.($row->subtotal - $row->descuento).'" data-delivered="'.$row->bidones_a_entregar.'" data-method="'.htmlspecialchars($row->metodo_pago ?? 'contraentrega').'">
+                            <i class="ri-check-double-line me-2 text-success align-middle"></i> Liquidar Entrega
                         </a>
                     </li>';
                 }
 
-                // Emitir Comprobante en POS
-                if ($canBill) {
+                // Emitir Comprobante en POS (solo personal habilitado para facturar)
+                if ($canBill && ! $isRepartidor) {
                     $urlToPos = route('deliveries.to_pos', $row->id);
                     $items .= '<li>
                         <a class="dropdown-item py-2" href="'.$urlToPos.'">
@@ -197,24 +236,37 @@ class DeliveryController extends Controller
                     }
                     $waText = urlencode("¡Hola! Tu pedido de agua *{$row->codigo_orden}* está en camino a {$row->direccion_entrega}. Total: S/ ".number_format($row->total, 2));
                     $items .= '<li>
-                        <a class="dropdown-item py-2" href="https://wa.me/'.$cleanPhone.'?text='.$waText.'" target="_blank">
+                        <a class="dropdown-item py-2" href="https://wa.me/'.$cleanPhone.'?text='.$waText.'" target="_blank" rel="noopener">
                             <i class="ri-whatsapp-line me-2 text-success align-middle"></i> Contactar por WhatsApp
                         </a>
                     </li>';
                 }
 
-                // Ver en Google Maps
-                $mapQuery = urlencode($row->coordenadas ?: ($row->direccion_entrega.', Peru'));
-                $items .= '<li>
-                    <a class="dropdown-item py-2" href="https://www.google.com/maps/search/?api=1&query='.$mapQuery.'" target="_blank">
-                        <i class="ri-map-pin-line me-2 text-danger align-middle"></i> Ver en Google Maps
-                    </a>
-                </li>';
+                // Google Maps - Ver ubicación y Ruta
+                $maps = $this->settlementService->buildMapsLinks($row);
+                if ($maps['has_location']) {
+                    $items .= '<li>
+                        <a class="dropdown-item py-2" href="'.htmlspecialchars($maps['view_url']).'" target="_blank" rel="noopener">
+                            <i class="ri-map-pin-line me-2 text-danger align-middle"></i> Ver Ubicación (Maps)
+                        </a>
+                    </li>';
+                    $items .= '<li>
+                        <a class="dropdown-item py-2" href="'.htmlspecialchars($maps['route_url']).'" target="_blank" rel="noopener">
+                            <i class="ri-navigation-line me-2 text-primary align-middle"></i> Cómo llegar (Ruta GPS)
+                        </a>
+                    </li>';
+                } else {
+                    $items .= '<li>
+                        <a class="dropdown-item py-2 text-muted disabled" href="javascript:void(0);" onclick="alert(\'Este pedido no tiene dirección ni coordenadas registradas.\')">
+                            <i class="ri-map-pin-line me-2 text-muted align-middle"></i> Sin ubicación registrada
+                        </a>
+                    </li>';
+                }
 
                 // Ver detalles (siempre disponible)
                 $items .= '<li>
                     <a class="dropdown-item btn-order-details py-2" href="javascript:void(0);" data-id="'.$row->id.'">
-                        <i class="ri-file-list-line me-2 text-secondary align-middle"></i> Ver Detalles
+                        <i class="ri-file-list-line me-2 text-secondary align-middle"></i> Ver Detalles y Auditoría
                     </a>
                 </li>';
 
@@ -232,7 +284,7 @@ class DeliveryController extends Controller
                     <button class="btn btn-sm btn-outline-primary dropdown-toggle waves-effect shadow-none" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="ri-more-2-fill me-1 align-middle"></i> Acciones
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="font-size: 0.85rem; min-width: 195px;">
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="font-size: 0.85rem; min-width: 215px;">
                         '.$items.'
                     </ul>
                 </div>';
@@ -350,16 +402,33 @@ class DeliveryController extends Controller
         }
 
         $order = DeliveryOrder::findOrFail($request->input('id'));
-        $order->update([
-            'idrepartidor' => $request->input('idrepartidor'),
-            'estado' => 'en_ruta',
-        ]);
+        $driver = User::findOrFail($request->input('idrepartidor'));
 
-        return response()->json([
-            'status' => true,
-            'msg' => "Pedido {$order->codigo_orden} despachado a ruta exitosamente.",
-            'type' => 'success',
-        ]);
+        try {
+            $order->idrepartidor = $driver->id;
+            $order->save();
+
+            $this->settlementService->transition(
+                order: $order,
+                newStatus: DeliverySettlementService::STATUS_EN_RUTA,
+                reason: 'Despacho a repartidor',
+                notes: "Asignado a {$driver->nombres}",
+                metadata: ['idrepartidor' => $driver->id, 'repartidor_nombre' => $driver->nombres],
+                userId: auth()->id()
+            );
+
+            return response()->json([
+                'status' => true,
+                'msg' => "Pedido {$order->codigo_orden} despachado a ruta exitosamente con {$driver->nombres}.",
+                'type' => 'success',
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'status' => false,
+                'msg' => $e->getMessage(),
+                'type' => 'warning',
+            ], 422);
+        }
     }
 
     public function complete(Request $request)
@@ -369,115 +438,10 @@ class DeliveryController extends Controller
             'bidones_vacios_recibidos' => 'required|integer|min:0',
             'bidones_danados_recibidos' => 'nullable|integer|min:0',
             'cobro_envases_danados' => 'nullable|numeric|min:0',
+            'motivo_liquidacion' => 'nullable|string|in:despacho_estandar,envase_danado,pedido_cancelado,envio_duplicado',
             'metodo_pago' => 'nullable|string|max:50',
             'estado_pago' => 'nullable|string|in:pagado,pendiente',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['status' => false, 'msg' => $validator->errors()->first()], 422);
-        }
-
-        $order = DB::transaction(function () use ($request) {
-            $order = DeliveryOrder::with('items')->findOrFail($request->input('id'));
-            $client = Client::findOrFail($order->idcliente);
-
-            $intact = (int) $request->input('bidones_vacios_recibidos', 0);
-            $damaged = (int) $request->input('bidones_danados_recibidos', 0);
-            $damageCost = (float) $request->input('cobro_envases_danados', 0);
-
-            $finalTotal = $order->total + $damageCost;
-
-            $order->update([
-                'estado' => 'entregado',
-                'fecha_entrega' => Carbon::now(),
-                'bidones_vacios_recibidos' => $intact,
-                'bidones_danados_recibidos' => $damaged,
-                'cobro_envases_danados' => $damageCost,
-                'total' => $finalTotal,
-                'metodo_pago' => $request->input('metodo_pago') ?: $order->metodo_pago,
-                'estado_pago' => $request->input('estado_pago', 'pagado'),
-            ]);
-
-            // Registrar movimiento de envases
-            $this->jugService->recordMovement(
-                client: $client,
-                deliveredFull: $order->bidones_a_entregar,
-                returnedIntact: $intact,
-                returnedDamaged: $damaged,
-                damageCost: $damageCost,
-                movementType: 'entrega_recarga',
-                orderId: $order->id,
-                warehouseId: $order->idalmacen,
-                userId: auth()->id(),
-                notes: "Entrega completada orden {$order->codigo_orden}"
-            );
-
-            // Acumular puntos de fidelidad por bidones entregados
-            $eligibleCount = 0;
-            foreach ($order->items as $item) {
-                if ($item->tipo_item === 'recarga' || stripos($item->descripcion, 'recarga') !== false) {
-                    $eligibleCount += (int) $item->cantidad;
-                }
-            }
-
-            if ($eligibleCount > 0) {
-                $this->loyaltyService->accumulatePurchases($client, $eligibleCount);
-            }
-
-            return $order;
-        });
-
-        // Generar enlace de comprobante por WhatsApp fuera de la transacción DB
-        $order->loadMissing('cliente');
-        $whatsappUrl = null;
-        $client = $order->cliente;
-        $phone = $order->telefono_contacto ?: ($client?->telefono);
-
-        if ($phone) {
-            $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
-            if (strlen($cleanPhone) === 9) {
-                $cleanPhone = '51'.$cleanPhone;
-            }
-
-            $business = Business::first();
-            $businessName = $business?->nombre ?? 'Pala-Sed';
-
-            $receiptMessage = "💧 *COMPROBANTE DE ENTREGA - {$businessName}*\n"
-                ."━━━━━━━━━━━━━━━━━━━━━\n"
-                ."📄 *Pedido:* {$order->codigo_orden}\n"
-                .'👤 *Cliente:* '.($client?->nombres ?? 'Cliente')."\n"
-                .'📅 *Fecha:* '.Carbon::parse($order->fecha_entrega)->format('d/m/Y H:i')."\n"
-                ."📍 *Dirección:* {$order->direccion_entrega}\n"
-                ."━━━━━━━━━━━━━━━━━━━━━\n"
-                ."📦 *Bidones Entregados:* {$order->bidones_a_entregar}\n"
-                ."🔄 *Envases Devueltos:* {$order->bidones_vacios_recibidos}\n";
-
-            if ($order->bidones_danados_recibidos > 0) {
-                $receiptMessage .= "⚠️ *Envases Dañados:* {$order->bidones_danados_recibidos} (S/ ".number_format($order->cobro_envases_danados, 2).")\n";
-            }
-
-            $receiptMessage .= '💳 *Método de Pago:* '.ucfirst($order->metodo_pago ?? 'Efectivo')."\n"
-                .'💰 *TOTAL PAGADO:* S/ '.number_format($order->total, 2)."\n"
-                ."━━━━━━━━━━━━━━━━━━━━━\n"
-                .'¡Muchas gracias por su preferencia!';
-
-            $whatsappUrl = 'https://wa.me/'.$cleanPhone.'?text='.urlencode($receiptMessage);
-        }
-
-        return response()->json([
-            'status' => true,
-            'msg' => "¡Entrega de orden {$order->codigo_orden} completada con éxito!",
-            'type' => 'success',
-            'whatsapp_url' => $whatsappUrl,
-            'has_whatsapp' => ! empty($whatsappUrl),
-        ]);
-    }
-
-    public function cancel(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|exists:delivery_orders,id',
-            'motivo' => 'nullable|string|max:255',
+            'notas' => 'nullable|string|max:500',
         ]);
 
         if ($validator->fails()) {
@@ -485,25 +449,149 @@ class DeliveryController extends Controller
         }
 
         $order = DeliveryOrder::findOrFail($request->input('id'));
-        $order->update([
-            'estado' => 'cancelado',
-            'notas' => ($order->notas ? $order->notas.' | ' : '').'Cancelado: '.$request->input('motivo', 'Sin motivo'),
+
+        $user = auth()->user();
+        $isRepartidor = $user && $user->hasRole('REPARTIDOR') && ! $user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO']);
+        if ($isRepartidor && (int) $order->idrepartidor !== (int) $user->id) {
+            return response()->json([
+                'status' => false,
+                'msg' => 'No tienes permisos para liquidar un pedido asignado a otro repartidor.',
+                'type' => 'danger',
+            ], 403);
+        }
+
+        try {
+            $result = $this->settlementService->settle($order, $request->all(), $user?->id);
+
+            return response()->json($result);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'status' => false,
+                'msg' => $e->getMessage(),
+                'type' => 'warning',
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => false,
+                'msg' => 'Error al liquidar el pedido: '.$e->getMessage(),
+                'type' => 'error',
+            ], 500);
+        }
+    }
+
+    public function cancel(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'id' => 'required|exists:delivery_orders,id',
+            'motivo' => 'nullable|string|max:255',
+            'motivo_liquidacion' => 'nullable|string|in:despacho_estandar,envase_danado,pedido_cancelado,envio_duplicado',
         ]);
 
-        return response()->json([
-            'status' => true,
-            'msg' => "Pedido {$order->codigo_orden} cancelado.",
-            'type' => 'success',
-        ]);
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'msg' => $validator->errors()->first()], 422);
+        }
+
+        $order = DeliveryOrder::findOrFail($request->input('id'));
+
+        $user = auth()->user();
+        $isRepartidor = $user && $user->hasRole('REPARTIDOR') && ! $user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO']);
+        if ($isRepartidor && (int) $order->idrepartidor !== (int) $user->id) {
+            return response()->json([
+                'status' => false,
+                'msg' => 'No tienes permisos para cancelar un pedido asignado a otro repartidor.',
+                'type' => 'danger',
+            ], 403);
+        }
+
+        $reason = $request->input('motivo') ?: ($request->input('motivo_liquidacion') ?: DeliverySettlementService::REASON_CANCELLED_ORDER);
+
+        try {
+            $this->settlementService->cancel($order, $reason, $user?->id);
+
+            return response()->json([
+                'status' => true,
+                'msg' => "Pedido {$order->codigo_orden} cancelado.",
+                'type' => 'success',
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'status' => false,
+                'msg' => $e->getMessage(),
+                'type' => 'warning',
+            ], 422);
+        }
     }
 
     public function show($id)
     {
-        $order = DeliveryOrder::with(['cliente', 'repartidor', 'items.producto'])->findOrFail($id);
+        $order = DeliveryOrder::with([
+            'cliente',
+            'repartidor',
+            'items.producto',
+            'statusLogs.usuario',
+            'arqueoCaja',
+        ])->findOrFail($id);
+
+        $user = auth()->user();
+        $isRepartidor = $user && $user->hasRole('REPARTIDOR') && ! $user->hasAnyRole(['ADMIN', 'SUPERADMIN', 'CAJERO']);
+        if ($isRepartidor && (int) $order->idrepartidor !== (int) $user->id) {
+            return response()->json([
+                'status' => false,
+                'msg' => 'No tienes permisos para visualizar este pedido.',
+            ], 403);
+        }
+
+        $maps = $this->settlementService->buildMapsLinks($order);
 
         return response()->json([
             'status' => true,
             'order' => $order,
+            'maps' => $maps,
+            'status_logs' => $order->statusLogs,
+        ]);
+    }
+
+    public function containers_summary(Request $request)
+    {
+        $summary = [
+            'total_prestados' => (int) Client::sum('saldo_envases'),
+            'total_danados' => (int) DeliveryOrder::sum('bidones_danados_recibidos'),
+            'total_entregados' => (int) DeliveryOrder::where('estado', 'entregado')->sum('bidones_a_entregar'),
+            'total_devueltos' => (int) DeliveryOrder::where('estado', 'entregado')->sum('bidones_vacios_recibidos'),
+            'clientes_con_saldo' => Client::where('saldo_envases', '!=', 0)->count(),
+        ];
+
+        $clientsQuery = Client::select('id', 'nombres', 'nro_documento', 'telefono', 'direccion', 'saldo_envases')
+            ->where('saldo_envases', '!=', 0)
+            ->orWhereExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('delivery_orders')
+                    ->whereColumn('delivery_orders.idcliente', 'clients.id')
+                    ->where('delivery_orders.bidones_danados_recibidos', '>', 0);
+            })
+            ->orderByDesc('saldo_envases');
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return DataTables::of($clientsQuery)
+                ->with([
+                    'status' => true,
+                    'summary' => $summary,
+                ])
+                ->addColumn('danados_historicos', function ($row) {
+                    return (int) DeliveryOrder::where('idcliente', $row->id)->sum('bidones_danados_recibidos');
+                })
+                ->addColumn('entregados_historicos', function ($row) {
+                    return (int) DeliveryOrder::where('idcliente', $row->id)->where('estado', 'entregado')->sum('bidones_a_entregar');
+                })
+                ->addColumn('devueltos_historicos', function ($row) {
+                    return (int) DeliveryOrder::where('idcliente', $row->id)->where('estado', 'entregado')->sum('bidones_vacios_recibidos');
+                })
+                ->make(true);
+        }
+
+        return response()->json([
+            'status' => true,
+            'summary' => $summary,
         ]);
     }
 

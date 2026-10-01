@@ -385,6 +385,7 @@ Route::controller(DeliveryController::class)->prefix('deliveries')->middleware([
     Route::post('/complete', 'complete')->name('deliveries.complete');
     Route::post('/cancel', 'cancel')->name('deliveries.cancel');
     Route::get('/show/{id}', 'show')->name('deliveries.show');
+    Route::get('/containers-summary', 'containers_summary')->name('deliveries.containers_summary');
     Route::get('/qr', 'qr_generator')->name('admin.deliveries.qr');
     Route::get('/to-pos/{id}', 'toPOS')->name('deliveries.to_pos')->middleware('can:admin.pos');
 });

@@ -157,73 +157,108 @@
 </div>
 
 <!-- Modal: Completar Entrega y Liquidar Envases -->
-<div class="modal fade" id="modal-complete-delivery" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+<div class="modal fade" id="modal-complete-delivery" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-light">
                 <h5 class="modal-title fw-bold text-dark">
-                    <i class="ri-check-double-line me-1 text-success"></i> Completar Entrega y Retorno de Envases
+                    <i class="ri-check-double-line me-1 text-success"></i> Liquidación de Entrega y Retorno de Envases
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <form id="form-complete-delivery">
                 @csrf
                 <input type="hidden" name="id" id="complete_order_id">
+                <input type="hidden" id="complete_base_subtotal" value="0">
                 <div class="modal-body">
                     <div class="alert alert-light border mb-3 p-3">
-                        <div class="d-flex justify-content-between">
-                            <span class="small text-muted">Orden: <strong id="complete_order_code"></strong></span>
-                            <span class="small text-muted">Cliente: <strong id="complete_order_client"></strong></span>
-                        </div>
-                        <div class="mt-2 fw-bold text-primary">
-                            Bidones llenos entregados: <span id="complete_delivered_count" class="badge bg-primary">0</span>
+                        <div class="row align-items-center">
+                            <div class="col-sm-6">
+                                <span class="small text-muted d-block">Pedido: <strong id="complete_order_code" class="text-primary"></strong></span>
+                                <span class="small text-muted d-block">Cliente: <strong id="complete_order_client" class="text-dark"></strong></span>
+                            </div>
+                            <div class="col-sm-6 text-sm-end mt-2 mt-sm-0">
+                                <span class="small text-muted d-block">Bidones Llenos Entregados:</span>
+                                <span id="complete_delivered_count" class="badge bg-primary fs-6 px-3">0</span>
+                            </div>
                         </div>
                     </div>
 
                     <div class="row g-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label small fw-bold text-success">
-                                <i class="ri-checkbox-circle-line me-1"></i> Vacíos Intactos Recibidos <span class="text-danger">*</span>
+                                <i class="ri-checkbox-circle-line me-1"></i> Vacíos Intactos <span class="text-danger">*</span>
                             </label>
                             <input type="number" name="bidones_vacios_recibidos" id="complete_intact" class="form-control" min="0" value="0" required>
-                            <small class="text-muted" style="font-size: 11px;">Envases aptos para lavado y recarga.</small>
+                            <small class="text-muted" style="font-size: 11px;">Aptos para recarga y lavado.</small>
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label small fw-bold text-danger">
-                                <i class="ri-error-warning-line me-1"></i> Vacíos Dañados / Rotos
+                                <i class="ri-error-warning-line me-1"></i> Dañados / Rotos
                             </label>
                             <input type="number" name="bidones_danados_recibidos" id="complete_damaged" class="form-control" min="0" value="0">
-                            <small class="text-muted" style="font-size: 11px;">Fisurados, rotos o inservibles.</small>
+                            <small class="text-muted" style="font-size: 11px;">Fisurados, golpeados o inservibles.</small>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Cobro por Envases Dañados (S/)</label>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-dark">
+                                Cobro por Envases Dañados (S/)
+                            </label>
                             <input type="number" step="0.50" name="cobro_envases_danados" id="complete_damage_cost" class="form-control" min="0" value="0.00">
+                            <small class="text-muted" style="font-size: 11px;">Monto adicional a sumar al total.</small>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Método de Pago Recibido</label>
-                            <select name="metodo_pago" id="complete_payment_method" class="form-select">
-                                <option value="efectivo">Efectivo</option>
-                                <option value="yape">Yape</option>
-                                <option value="plin">Plin</option>
-                                <option value="transferencia">Transferencia</option>
-                                <option value="credito">Queda a crédito</option>
+                            <label class="form-label small fw-bold">Motivo de Liquidación <span class="text-danger">*</span></label>
+                            <select name="motivo_liquidacion" id="complete_motivo" class="form-select" required>
+                                <option value="despacho_estandar" selected>Despacho estándar / Liquidación conforme</option>
+                                <option value="envase_danado">Envase dañado / cobro por merma</option>
+                                <option value="pedido_cancelado">Pedido cancelado en destino</option>
+                                <option value="envio_duplicado">Envío duplicado / anulación</option>
                             </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Método de Pago Real Utilizado <span class="text-danger">*</span></label>
+                            <select name="metodo_pago" id="complete_payment_method" class="form-select">
+                                @foreach($payModes as $pm)
+                                    <option value="{{ strtolower($pm->descripcion) }}">{{ $pm->descripcion }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">Notas u Observaciones de Liquidación</label>
+                            <input type="text" name="notas" id="complete_notas" class="form-control" placeholder="Ej. Cliente pagó con Yape al recibir, envase con tapa rota...">
+                        </div>
+
+                        <div class="col-12">
+                            <div class="p-3 bg-light rounded border d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="small text-muted d-block">Subtotal Pedido: <strong id="complete_order_subtotal">S/ 0.00</strong></span>
+                                    <span class="small text-danger d-block">+ Cargo Envases Dañados: <strong id="complete_display_damage_cost">S/ 0.00</strong></span>
+                                </div>
+                                <div class="text-end">
+                                    <span class="small text-muted fw-bold text-uppercase d-block">Total a Liquidar:</span>
+                                    <span class="h4 mb-0 fw-bold text-success" id="complete_calculated_total">S/ 0.00</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-12">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="complete_paid_switch" name="estado_pago" value="pagado" checked>
-                                <label class="form-check-label small fw-bold" for="complete_paid_switch">Marcar pedido como PAGADO</label>
+                                <label class="form-check-label small fw-bold" for="complete_paid_switch">
+                                    Registrar pago de inmediato en Arqueo de Caja activo (Invariante B1)
+                                </label>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success px-4">
+                    <button type="submit" class="btn btn-success px-4" id="btn-submit-complete">
                         <i class="ri-check-line me-1"></i> Confirmar y Liquidar
                     </button>
                 </div>
@@ -232,9 +267,9 @@
     </div>
 </div>
 
-<!-- Modal: Ver Detalles del Pedido -->
+<!-- Modal: Ver Detalles del Pedido y Auditoría de Estados -->
 <div class="modal fade" id="modal-view-order" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-md modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-light">
                 <h5 class="modal-title fw-bold text-dark" id="view_order_title">Detalle del Pedido</h5>
@@ -243,6 +278,69 @@
             <div class="modal-body" id="view_order_content">
                 <div class="text-center py-4">
                     <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Seguimiento y Control de Envases por Cliente -->
+<div class="modal fade" id="modal-containers-summary" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="ri-archive-line me-1 text-primary"></i> Control y Seguimiento de Envases por Cliente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3 text-center">
+                    <div class="col-sm-6 col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <span class="small text-muted d-block">Envases Prestados:</span>
+                            <span class="h5 mb-0 fw-bold text-primary" id="summary_total_prestados">{{ $containerSummary['total_prestados'] }}</span>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <span class="small text-muted d-block">Total Entregados:</span>
+                            <span class="h5 mb-0 fw-bold text-success" id="summary_total_entregados">{{ $containerSummary['total_entregados'] }}</span>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <span class="small text-muted d-block">Total Devueltos Intactos:</span>
+                            <span class="h5 mb-0 fw-bold text-info" id="summary_total_devueltos">{{ $containerSummary['total_devueltos'] }}</span>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <span class="small text-muted d-block">Dañados / Mermas:</span>
+                            <span class="h5 mb-0 fw-bold text-danger" id="summary_total_danados">{{ $containerSummary['total_danados'] }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="table-containers-summary" class="table table-sm table-hover align-middle w-100">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Documento</th>
+                                <th>Teléfono</th>
+                                <th>Dirección</th>
+                                <th class="text-center">Saldo Actual</th>
+                                <th class="text-center">Entregados</th>
+                                <th class="text-center">Devueltos</th>
+                                <th class="text-center">Dañados</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
             <div class="modal-footer bg-light">

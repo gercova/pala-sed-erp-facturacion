@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Http\Controllers\ReportPaymentController;
 use App\Models\ArchingCash;
 use App\Models\Billing;
+use App\Models\Business;
 use App\Models\Cash;
 use App\Models\Client;
+use App\Models\Currency;
 use App\Models\DeliveryOrder;
 use App\Models\DetailPayment;
 use App\Models\IdentityDocumentType;
@@ -21,13 +23,19 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Water\LoyaltyService;
+use Database\Seeders\CurrencySeeder;
+use Database\Seeders\IdentityDocumentTypeSeeder;
+use Database\Seeders\IgvTypeAffectionSeeder;
 use Database\Seeders\PayModeSeeder;
+use Database\Seeders\RoleSeeder;
 use Database\Seeders\TypeDocumentSeeder;
+use Database\Seeders\WarehouseSeeder;
 use Database\Seeders\WaterDistributionSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -41,6 +49,11 @@ class BusinessLogicInvariantsTest extends TestCase
 
         $this->seed(TypeDocumentSeeder::class);
         $this->seed(PayModeSeeder::class);
+        $this->seed(IgvTypeAffectionSeeder::class);
+        $this->seed(CurrencySeeder::class);
+        $this->seed(IdentityDocumentTypeSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(WarehouseSeeder::class);
     }
 
     /**
@@ -50,9 +63,8 @@ class BusinessLogicInvariantsTest extends TestCase
     public function test_stock_invariance_applies_only_to_physical_products(): void
     {
         $warehouse = Warehouse::firstOrCreate(['id' => 1], [
-            'nombre' => 'Almacén Central Test',
+            'descripcion' => 'Almacén Central Test',
             'direccion' => 'Jr. Test 123',
-            'estado' => 1,
         ]);
 
         $unit = Unit::firstOrCreate(['codigo' => 'NIU'], [
@@ -60,14 +72,20 @@ class BusinessLogicInvariantsTest extends TestCase
             'estado' => 1,
         ]);
 
+        $category = \App\Models\Category::firstOrCreate(
+            ['descripcion' => 'AGUA Y BIDONES']
+        );
+
+        $igv = \App\Models\IgvTypeAffection::first();
+
         // Producto Físico (opcion == 1)
         $physicalProduct = Product::create([
             'codigo_interno' => 'TEST-PHYS-01',
             'descripcion' => 'BIDON DE AGUA TEST 20L',
             'idunidad' => $unit->id,
-            'idcategoria' => 1,
+            'idcategoria' => $category->id,
             'igv' => 18,
-            'idcodigo_igv' => 1,
+            'idcodigo_igv' => $igv->id,
             'precio_compra' => 5.0,
             'precio_venta' => 15.0,
             'opcion' => 1,
@@ -90,9 +108,9 @@ class BusinessLogicInvariantsTest extends TestCase
             'codigo_interno' => 'TEST-SERV-01',
             'descripcion' => 'SERVICIO DE MANTENIMIENTO DISPENSADOR',
             'idunidad' => $unit->id,
-            'idcategoria' => 1,
+            'idcategoria' => $category->id,
             'igv' => 18,
-            'idcodigo_igv' => 1,
+            'idcodigo_igv' => $igv->id,
             'precio_compra' => 0.0,
             'precio_venta' => 25.0,
             'opcion' => 2,
@@ -132,6 +150,7 @@ class BusinessLogicInvariantsTest extends TestCase
 
         $docType = IdentityDocumentType::firstOrCreate(['codigo' => '1'], [
             'descripcion' => 'DNI',
+            'descripcion_documento' => 'DNI',
             'estado' => 1,
         ]);
 
@@ -168,6 +187,7 @@ class BusinessLogicInvariantsTest extends TestCase
 
         $docType = IdentityDocumentType::firstOrCreate(['codigo' => '1'], [
             'descripcion' => 'DNI',
+            'descripcion_documento' => 'DNI',
             'estado' => 1,
         ]);
 
@@ -201,18 +221,25 @@ class BusinessLogicInvariantsTest extends TestCase
         $adminUser->assignRole('ADMIN');
 
         // Modo por defecto: 'password'
-        config(['erp.client_login_mode' => 'password']);
+        $business = Business::firstOrCreate(['id' => 1], [
+            'ruc' => '20123456789',
+            'razon_social' => 'TEST BUSINESS',
+            'direccion' => 'Jr. Central 123',
+        ]);
+        $business->update(['auth_cliente_metodo' => 'password']);
+        config(['auth_cliente.metodo' => 'password']);
 
         // En modo 'password', enviar login sin contraseña debe fallar
         $resPass = $this->post(route('login.login'), [
             'user' => '88887777',
             'password' => '',
         ]);
-        $resPass->assertSessionHasErrors(['password']);
+        $resPass->assertSessionHas('message');
         $this->assertFalse(Auth::check());
 
-        // Modo Feature Flag: 'id_only'
-        config(['erp.client_login_mode' => 'id_only']);
+        // Modo Feature Flag: 'dni'
+        $business->update(['auth_cliente_metodo' => 'dni']);
+        config(['auth_cliente.metodo' => 'dni']);
 
         // El cliente puede ingresar con solo su DNI sin contraseña
         $resIdOnly = $this->post(route('login.login'), [
@@ -300,6 +327,24 @@ class BusinessLogicInvariantsTest extends TestCase
         $docTypeNV = TypeDocument::where('codigo', '02')->first();
         $docTypeBol = TypeDocument::where('codigo', '03')->first();
 
+        $docType = IdentityDocumentType::firstOrCreate(['codigo' => '1'], [
+            'descripcion' => 'DNI',
+            'descripcion_documento' => 'DNI',
+            'estado' => 1,
+        ]);
+        $client = Client::firstOrCreate(['id' => 1], [
+            'iddoc' => $docType->id,
+            'nro_documento' => '11223344',
+            'nombres' => 'CLIENTE TEST FACTURA',
+            'telefono' => '999888777',
+            'direccion' => 'Jr. Principal 123',
+            'codigo_pais' => 'PE',
+            'saldo_envases' => 0,
+        ]);
+
+        $currency = Currency::where('codigo', 'PEN')->first() ?? Currency::first();
+        $wh = Warehouse::first();
+
         // 1. Nota de Venta (S/ 30.00 con Yape)
         $saleNote = SaleNote::create([
             'idtipo_comprobante' => $docTypeNV->id,
@@ -308,7 +353,7 @@ class BusinessLogicInvariantsTest extends TestCase
             'fecha_emision' => $today,
             'fecha_vencimiento' => $today,
             'hora' => '10:00:00',
-            'idcliente' => 1,
+            'idcliente' => $client->id,
             'subtotal' => 30.0,
             'igv' => 0.0,
             'total' => 30.0,
@@ -334,8 +379,8 @@ class BusinessLogicInvariantsTest extends TestCase
             'fecha_emision' => $today,
             'fecha_vencimiento' => $today,
             'hora' => '10:15:00',
-            'idcliente' => 1,
-            'idmoneda' => 1,
+            'idcliente' => $client->id,
+            'idmoneda' => $currency->id,
             'idpago' => $payModeTrans->id,
             'modo_pago' => $payModeTrans->id,
             'sunat_forma_pago' => 'Contado',
@@ -353,7 +398,7 @@ class BusinessLogicInvariantsTest extends TestCase
             'nticket' => 'B001-00000099',
             'idusuario' => $user->id,
             'idarqueocaja' => $arching->id,
-            'idalmacen' => 1,
+            'idalmacen' => $wh->id,
         ]);
 
         DetailPayment::create([
@@ -387,7 +432,14 @@ class BusinessLogicInvariantsTest extends TestCase
      */
     public function test_delivery_completion_generates_whatsapp_receipt_outside_transaction(): void
     {
-        Role::firstOrCreate(['name' => 'ADMIN']);
+        $roleAdmin = Role::firstOrCreate(['name' => 'ADMIN', 'guard_name' => 'web']);
+        $permDeliveries = Permission::firstOrCreate(['name' => 'admin.deliveries', 'guard_name' => 'web']);
+        $roleAdmin->givePermissionTo($permDeliveries);
+
+        $warehouse = Warehouse::firstOrCreate(
+            ['id' => 1],
+            ['descripcion' => 'Almacén Central', 'direccion' => 'Jr. Central 123']
+        );
 
         $user = User::create([
             'nombres' => 'TEST REPARTIDOR ADMIN',
@@ -395,12 +447,14 @@ class BusinessLogicInvariantsTest extends TestCase
             'password' => Hash::make('secret'),
             'estado' => 1,
             'tipo' => 'admin',
+            'idalmacen' => $warehouse->id,
         ]);
         $user->assignRole('ADMIN');
         $this->actingAs($user);
 
         $docType = IdentityDocumentType::firstOrCreate(['codigo' => '1'], [
             'descripcion' => 'DNI',
+            'descripcion_documento' => 'DNI',
             'estado' => 1,
         ]);
 
@@ -433,6 +487,7 @@ class BusinessLogicInvariantsTest extends TestCase
 
         $response = $this->post(route('deliveries.complete'), [
             'id' => $order->id,
+            'motivo_liquidacion' => 'despacho_estandar',
             'bidones_vacios_recibidos' => 2,
             'bidones_danados_recibidos' => 0,
             'cobro_envases_danados' => 0,

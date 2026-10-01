@@ -104,6 +104,7 @@ class RoleSeeder extends Seeder
             'admin.sale_notes',
             'admin.billings',
             'admin.arching_cashes',
+            'admin.deliveries',
         ]);
 
         $contabilidad->syncPermissions([
